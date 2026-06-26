@@ -1,4 +1,5 @@
 #include "block.h"
+#include "Super_Mario_Bros__24pt7b.h"
 
 //String &Block::_text;
 String secondsText;
@@ -42,8 +43,9 @@ void Block::setTextBlock()
   Serial.print(_text);
   Serial.println("'");
 
-  // Locator::getDisplay()->setTextColor(0x0000);       
-  Locator::getDisplay()->setTextColor(0xFFFF);       
+  Locator::getDisplay()->setFont(&Super_Mario_Bros__24pt7b);
+  Locator::getDisplay()->setTextColor(0x0000);        // black
+  // Locator::getDisplay()->setTextColor(0xFFFF);     // white
     
   if (_text.length() == 1) 
     {
