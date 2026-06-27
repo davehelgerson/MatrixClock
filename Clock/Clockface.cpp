@@ -584,3 +584,71 @@ int Clockface2::countBlocks(Clockface2::MapBlock elem) {
 
   return count;
 }
+//**********************************************************************************************
+//**********************************************************************************************
+//Clockface4 - Maple the Cat ********************************************************************
+//**********************************************************************************************
+//**********************************************************************************************
+Clockface4::Clockface4(Adafruit_GFX* display)
+    : _maple(4, MAPLE_CAT_GROUND_Y), _lastMinMillis(0), _nextWalkDir(RIGHT)
+{
+  _display = display;
+  Locator::provide(display);
+  Locator::provide(&eventBus);
+}
+
+void Clockface4::setup(CWDateTime *dateTime) {
+  _dateTime = dateTime;
+  drawBackground();
+  updateClock();
+  _maple.init();
+  _lastMinMillis = millis();
+}
+
+void Clockface4::drawBackground() {
+  auto* d = Locator::getDisplay();
+
+  // Night sky
+  d->fillRect(0, 0, 64, 64, MAPLE_BG);
+
+  // Floor strip
+  d->fillRect(0, MAPLE_FLOOR_Y, 64, 64 - MAPLE_FLOOR_Y, MAPLE_FLOOR);
+
+  // Moon (positioned between time display and cat zone)
+  d->fillCircle(55, 26, 4, MAPLE_MOON);
+
+  // Stars (upper strip y=0-3, safe from time-erase at y=4-18)
+  d->drawPixel(4,  2, MAPLE_TIME);
+  d->drawPixel(14, 1, MAPLE_TIME);
+  d->drawPixel(28, 3, MAPLE_TIME);
+  d->drawPixel(44, 1, MAPLE_TIME);
+  // Mid strip y=20-30 (below time, above cat jump zone y=32+)
+  d->drawPixel(8,  21, MAPLE_TIME);
+  d->drawPixel(22, 27, MAPLE_TIME);
+  d->drawPixel(38, 23, MAPLE_TIME);
+}
+
+void Clockface4::updateClock() {
+  auto* d = Locator::getDisplay();
+  // Erase previous time (scale 3: 5 rows * 3 = 15 tall, ends at y=18)
+  d->fillRect(7, 4, 52, 15, MAPLE_BG);
+  drawCompactClockTime(d, _dateTime->getHour(), _dateTime->getMinute(), 7, 4, MAPLE_TIME, 3);
+}
+
+void Clockface4::update() {
+  _maple.update();
+
+  if (_dateTime->getSecond() == 0 && millis() - _lastMinMillis > 1000) {
+    _lastMinMillis = millis();
+    updateClock();
+
+    if (_dateTime->getMinute() == 0) {
+      // On the hour: jump!
+      _maple.jump();
+    } else {
+      // Every minute: walk to the other side
+      _maple.walk(_nextWalkDir);
+      _nextWalkDir = (_nextWalkDir == RIGHT) ? LEFT : RIGHT;
+    }
+  }
+}

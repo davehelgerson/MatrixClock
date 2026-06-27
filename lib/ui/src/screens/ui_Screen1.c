@@ -15,7 +15,7 @@ void ui_Screen1_screen_init(void)
 
     ui_Roller1 = lv_roller_create(ui_Screen1);
     lv_roller_set_options(ui_Roller1,
-                          "Mario\nPacman\nPokedex",
+                          "Mario\nPacman\nPokedex\nMaple",
                           LV_ROLLER_MODE_INFINITE);
     lv_obj_set_height(ui_Roller1, 150);
     lv_obj_set_width(ui_Roller1, LV_SIZE_CONTENT);   /// 1

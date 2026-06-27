@@ -58,6 +58,7 @@ CWDateTime cwDateTime;
 Clockface1 *clockface1;
 Clockface2 *clockface2;
 Clockface3 *clockface3;
+Clockface4 *clockface4;
 RTC_PCF8563 rtc;
 
 #define panelResX 64     // Number of pixels wide of each INDIVIDUAL panel module. 
@@ -129,6 +130,7 @@ void setup()
   clockface1 = new Clockface1(dma_display);
   clockface2 = new Clockface2(dma_display);
   clockface3 = new Clockface3(dma_display);
+  clockface4 = new Clockface4(dma_display);
 
   cwDateTime.begin();
   
@@ -177,9 +179,9 @@ void Task_Time(void *pvParameters)
 //**********************************************************************************************
 void Task_screen_sleep(void *pvParameters)
 {
-    // const unsigned long dimTimeout   = 300000UL;   // 5 minutes
+    const unsigned long dimTimeout   = 300000UL;   // 5 minutes
     const unsigned long sleepTimeout = 3600000UL;  // 1 hour
-    const unsigned long dimTimeout   = 3000UL;  // testing
+    // const unsigned long dimTimeout   = 3000UL;  // testing
     // const unsigned long sleepTimeout = 6000UL; // testing
 
     while (1)
@@ -230,10 +232,10 @@ void time_bg(int bg)
     clockface1->setup(&cwDateTime);
     clockface1->update();
     fresh_flag=0;break;
-    /*case 3:
-    clockface->setup(&cwDateTime);
-    clockface->update();
-    fresh_flag=0;break;*/
+    case 3:
+    clockface4->setup(&cwDateTime);
+    clockface4->update();
+    fresh_flag=0;break;
   }
 }
 
@@ -251,10 +253,10 @@ void update_time(int time)
   {
     clockface1->update();
   }
-  /*else if(time==3)
+  else if(time==3)
   {
-    clockface->update();
-  }*/
+    clockface4->update();
+  }
 }
 
 void pin_init()
@@ -341,8 +343,8 @@ void encoder_func()
             counter = 0;
 
             if (gif_num < 0)
-                gif_num = 2;
-            if (gif_num > 2)
+                gif_num = 3;
+            if (gif_num > 3)
                 gif_num = 0;
 
             Serial.print("gif_num=");

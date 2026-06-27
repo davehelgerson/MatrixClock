@@ -20,6 +20,7 @@
 #include "pacman.h"
 #include "hour_font.h"
 #include "picopixel.h"
+#include "maple.h"
 
 class Clockface: public IClockface {
   private:
@@ -69,6 +70,27 @@ class Clockface1: public IClockface {
     void refreshTime();
     void updatePokemon();
     void updateLoadingBar(uint8_t seconds);
+};
+//**********************************************************************************************
+//**********************************************************************************************
+//Clockface2************************************************************************************
+//**********************************************************************************************
+//**********************************************************************************************
+class Clockface4: public IClockface {
+  private:
+    Adafruit_GFX* _display;
+    CWDateTime* _dateTime;
+    MapleCat _maple;
+    unsigned long _lastMinMillis;
+    Direction _nextWalkDir;
+
+    void drawBackground();
+    void updateClock();
+
+  public:
+    Clockface4(Adafruit_GFX* display);
+    void setup(CWDateTime *dateTime);
+    void update();
 };
 //**********************************************************************************************
 //**********************************************************************************************
