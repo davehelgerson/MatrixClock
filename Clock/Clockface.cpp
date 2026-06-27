@@ -5,6 +5,70 @@ EventBus eventBus;
 
 const char* FORMAT_TWO_DIGITS = "%02d";
 
+const uint8_t CLOCK_DIGITS[10][7] = {
+  {0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E},
+  {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E},
+  {0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F},
+  {0x1F, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0E},
+  {0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02},
+  {0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E},
+  {0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E},
+  {0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08},
+  {0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E},
+  {0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x0C}
+};
+
+const uint8_t COMPACT_CLOCK_DIGITS[10][5] = {
+  {0x07, 0x05, 0x05, 0x05, 0x07},
+  {0x02, 0x06, 0x02, 0x02, 0x07},
+  {0x07, 0x01, 0x07, 0x04, 0x07},
+  {0x07, 0x01, 0x07, 0x01, 0x07},
+  {0x05, 0x05, 0x07, 0x01, 0x01},
+  {0x07, 0x04, 0x07, 0x01, 0x07},
+  {0x07, 0x04, 0x07, 0x05, 0x07},
+  {0x07, 0x01, 0x01, 0x01, 0x01},
+  {0x07, 0x05, 0x07, 0x05, 0x07},
+  {0x07, 0x05, 0x07, 0x01, 0x07}
+};
+
+void drawClockDigit(Adafruit_GFX* display, uint8_t digit, int16_t x, int16_t y, uint16_t color, uint8_t scale)
+{
+  for (uint8_t row = 0; row < 7; row++) {
+    for (uint8_t col = 0; col < 5; col++) {
+      if (CLOCK_DIGITS[digit][row] & (0x10 >> col)) {
+        display->fillRect(x + (col * scale), y + (row * scale), scale, scale, color);
+      }
+    }
+  }
+}
+
+void drawClockNumber(Adafruit_GFX* display, uint8_t value, int16_t x, int16_t y, uint16_t color, uint8_t scale)
+{
+  drawClockDigit(display, value / 10, x, y, color, scale);
+  drawClockDigit(display, value % 10, x + (6 * scale), y, color, scale);
+}
+
+void drawCompactClockDigit(Adafruit_GFX* display, uint8_t digit, int16_t x, int16_t y, uint16_t color, uint8_t scale)
+{
+  for (uint8_t row = 0; row < 5; row++) {
+    for (uint8_t col = 0; col < 3; col++) {
+      if (COMPACT_CLOCK_DIGITS[digit][row] & (0x04 >> col)) {
+        display->fillRect(x + (col * scale), y + (row * scale), scale, scale, color);
+      }
+    }
+  }
+}
+
+void drawCompactClockTime(Adafruit_GFX* display, uint8_t hour, uint8_t minute, int16_t x, int16_t y, uint16_t color, uint8_t scale)
+{
+  drawCompactClockDigit(display, hour / 10, x, y, color, scale);
+  drawCompactClockDigit(display, hour % 10, x + (4 * scale), y, color, scale);
+  display->fillRect(x + (8 * scale), y + (1 * scale), scale, scale, color);
+  display->fillRect(x + (8 * scale), y + (3 * scale), scale, scale, color);
+  drawCompactClockDigit(display, minute / 10, x + (10 * scale), y, color, scale);
+  drawCompactClockDigit(display, minute % 10, x + (14 * scale), y, color, scale);
+}
+
 // Graphical
 Tile ground(GROUND, 8, 8); 
 
@@ -235,9 +299,7 @@ void Clockface1::update()
 
     uint8_t seconds = _dateTime->getSecond();
 
-    if (seconds == 0) {
-      refreshTime();
-    }
+    refreshTime();
     updatePokemon();
     if (_dateTime->getMinute() == 0 && _dateTime->getSecond() == 0) {
       uint8_t wd = this->_dateTime->getWeekday();
@@ -268,15 +330,8 @@ void Clockface1::refreshTime() {
 
   // Clean up the clock area
   Locator::getDisplay()->fillRect(35, 17, 26, 14, LIGHT_BLACK);
-  Locator::getDisplay()->setTextColor(0xffff);//white
-  //snprintf(minutes, sizeof(minutes), "%02d", _dateTime->getMinute());
-
-  Locator::getDisplay()->setCursor(35, 22);
-  Locator::getDisplay()->print(_dateTime->getHour(FORMAT_TWO_DIGITS));
-
-  Locator::getDisplay()->setCursor(46, 30);
-  //Locator::getDisplay()->print(minutes);
-  Locator::getDisplay()->print(_dateTime->getMinute(FORMAT_TWO_DIGITS));
+  drawClockNumber(Locator::getDisplay(), _dateTime->getHour(), 36, 17, 0xffff, 1);
+  drawClockNumber(Locator::getDisplay(), _dateTime->getMinute(), 49, 24, 0xffff, 1);
 
   /*if (!_dateTime->is24hFormat())
     Locator::getDisplay()->drawBitmap(55, 18, (_dateTime->isAM() ? AM_SIGN : PM_SIGN), 4, 4, 0xffff);*/
@@ -318,17 +373,7 @@ void Clockface2::update()
     
     uint8_t seconds = _dateTime->getSecond();
 
-    if (seconds == 0) {
-      updateClock();
-    }
-
-    if (show_seconds) {
-      Locator::getDisplay()->fillRect(31, 24, 2, 2, 0xFE40);
-      Locator::getDisplay()->fillRect(31, 29, 2, 2, 0xFE40);
-    } else  {
-      Locator::getDisplay()->fillRect(31, 24, 2, 2, 0);
-      Locator::getDisplay()->fillRect(31, 29, 2, 2, 0);
-    }
+    updateClock();
 
     show_seconds = !show_seconds;
     lastMillisSec2 = millis();
@@ -413,24 +458,7 @@ void Clockface2::drawMap()
 void Clockface2::updateClock() {
 
   Locator::getDisplay()->fillRect(14, 19, 36, 26, 0x0000);
-
-  Locator::getDisplay()->setFont(&Picopixel);
-  Locator::getDisplay()->setTextColor(0xAD55);
-  Locator::getDisplay()->setCursor(15, 41);
-  Locator::getDisplay()->print(monthName(_dateTime->getMonth()));
-  Locator::getDisplay()->print(" ");
-  Locator::getDisplay()->print(_dateTime->getDay());
-  Locator::getDisplay()->print(" ");
-  Locator::getDisplay()->print(weekDayName(_dateTime->getWeekday()));
-  
-  Locator::getDisplay()->setFont(&hourFont);
-  
-  Locator::getDisplay()->setTextColor(0xFE40);
-  Locator::getDisplay()->setCursor(15, 28);
-  
-  Locator::getDisplay()->print(_dateTime->getHour(FORMAT_TWO_DIGITS));
-  Locator::getDisplay()->print(" ");
-  Locator::getDisplay()->print(_dateTime->getMinute(FORMAT_TWO_DIGITS));
+  drawCompactClockTime(Locator::getDisplay(), _dateTime->getHour(), _dateTime->getMinute(), 15, 27, 0xFE40, 2);
 }
 
 Clockface2::MapBlock Clockface2::nextBlock() {

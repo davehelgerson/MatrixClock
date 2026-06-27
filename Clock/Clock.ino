@@ -179,7 +179,7 @@ void Task_screen_sleep(void *pvParameters)
     while (1)
     {
         // screen sleep
-        if(millis()-screen_lastMillis>120000)//2 min
+        if(millis()-screen_lastMillis>240000)//4 min
         {
             screen_sleep=1;
             gfx->displayOff();
