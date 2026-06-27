@@ -49,6 +49,7 @@ int brightness = 30;
 int page_index = 0;
 int gif_num = 0;
 int fresh_flag = 0;
+bool screen_dimmed = false;
 
 MatrixPanel_I2S_DMA *dma_display = nullptr;
 
@@ -136,7 +137,7 @@ void setup()
 
   xTaskCreatePinnedToCore(Task_TFT, "Task_TFT", 10240, NULL, 2, NULL, 0);
   xTaskCreatePinnedToCore(Task_Main, "Task_Main", 4096, NULL, 1, NULL, 0);
-  delay(2500);//开机界面结束后才显示灯板
+  delay(2500);
   xTaskCreatePinnedToCore(Task_Time, "Task_Time", 102400, NULL, 1, NULL, 1);
   xTaskCreatePinnedToCore(Task_screen_sleep, "Task_screen_sleep", 10240, NULL, 1, NULL, 0);
 }
@@ -176,27 +177,42 @@ void Task_Time(void *pvParameters)
 //**********************************************************************************************
 void Task_screen_sleep(void *pvParameters)
 {
+    // const unsigned long dimTimeout   = 300000UL;   // 5 minutes
+    const unsigned long sleepTimeout = 3600000UL;  // 1 hour
+    const unsigned long dimTimeout   = 3000UL;  // testing
+    // const unsigned long sleepTimeout = 6000UL; // testing
+
     while (1)
     {
-        // screen sleep
-        if(millis()-screen_lastMillis>240000)//4 min
+        unsigned long idleTime = millis() - screen_lastMillis;
+
+        if (!screen_sleep && idleTime >= sleepTimeout)
         {
-            screen_sleep=1;
+            screen_sleep = 1;
+            screen_dimmed = false;
             gfx->displayOff();
             dma_display->setBrightness(0);
-            if(screen_weak_up==1)
-            {
-                gfx->displayOn();
-                dma_display->setBrightness(map(brightness, 0, 100, 0, 255));
-                screen_lastMillis=millis();
-                screen_weak_up=0;
-                screen_sleep=0;
-            }
         }
-        vTaskDelay(100);
+        else if (!screen_sleep && !screen_dimmed && idleTime >= dimTimeout && brightness > 5)
+        {
+            screen_dimmed = true;
+            dma_display->setBrightness(map(5, 0, 100, 0, 255));
+        }
+
+        if (screen_weak_up == 1)
+        {
+            gfx->displayOn();
+            dma_display->setBrightness(map(brightness, 0, 100, 0, 255));
+            screen_lastMillis = millis();
+            screen_weak_up = 0;
+            screen_sleep = 0;
+            screen_dimmed = false;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
-    
 }
+
 //**********************************************************************************************
 void time_bg(int bg)
 {
@@ -268,7 +284,7 @@ void encoder_irq()
             counter--;
         }
 
-        if(screen_sleep==1)
+        if(screen_sleep==1 || screen_dimmed)
         {
             screen_weak_up= 1;
         }
@@ -303,7 +319,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
         data->point.x = (uint16_t)(240 - touchY);
         data->point.y = (uint16_t)touchX;
 
-        if(screen_sleep==1)
+        if(screen_sleep==1 || screen_dimmed)
         {
             screen_weak_up= 1;
         }

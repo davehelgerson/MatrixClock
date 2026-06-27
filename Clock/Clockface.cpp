@@ -31,21 +31,21 @@ const uint8_t COMPACT_CLOCK_DIGITS[10][5] = {
   {0x07, 0x05, 0x07, 0x01, 0x07}
 };
 
-void drawClockDigit(Adafruit_GFX* display, uint8_t digit, int16_t x, int16_t y, uint16_t color, uint8_t scale)
+void drawClockDigit(Adafruit_GFX* display, uint8_t digit, int16_t x, int16_t y, uint16_t color)
 {
   for (uint8_t row = 0; row < 7; row++) {
     for (uint8_t col = 0; col < 5; col++) {
       if (CLOCK_DIGITS[digit][row] & (0x10 >> col)) {
-        display->fillRect(x + (col * scale), y + (row * scale), scale, scale, color);
+        display->drawPixel(x + col, y + row, color);
       }
     }
   }
 }
 
-void drawClockNumber(Adafruit_GFX* display, uint8_t value, int16_t x, int16_t y, uint16_t color, uint8_t scale)
+void drawClockNumber(Adafruit_GFX* display, uint8_t value, int16_t x, int16_t y, uint16_t color)
 {
-  drawClockDigit(display, value / 10, x, y, color, scale);
-  drawClockDigit(display, value % 10, x + (6 * scale), y, color, scale);
+  drawClockDigit(display, value / 10, x, y, color);
+  drawClockDigit(display, value % 10, x + 6, y, color);
 }
 
 void drawCompactClockDigit(Adafruit_GFX* display, uint8_t digit, int16_t x, int16_t y, uint16_t color, uint8_t scale)
@@ -63,7 +63,7 @@ void drawCompactClockTime(Adafruit_GFX* display, uint8_t hour, uint8_t minute, i
 {
   drawCompactClockDigit(display, hour / 10, x, y, color, scale);
   drawCompactClockDigit(display, hour % 10, x + (4 * scale), y, color, scale);
-  display->fillRect(x + (8 * scale), y + (1 * scale), scale, scale, color);
+  display->fillRect(x + (8 * scale), y + scale, scale, scale, color);
   display->fillRect(x + (8 * scale), y + (3 * scale), scale, scale, color);
   drawCompactClockDigit(display, minute / 10, x + (10 * scale), y, color, scale);
   drawCompactClockDigit(display, minute % 10, x + (14 * scale), y, color, scale);
@@ -330,8 +330,8 @@ void Clockface1::refreshTime() {
 
   // Clean up the clock area
   Locator::getDisplay()->fillRect(35, 17, 26, 14, LIGHT_BLACK);
-  drawClockNumber(Locator::getDisplay(), _dateTime->getHour(), 36, 17, 0xffff, 1);
-  drawClockNumber(Locator::getDisplay(), _dateTime->getMinute(), 49, 24, 0xffff, 1);
+  drawClockNumber(Locator::getDisplay(), _dateTime->getHour(), 36, 17, 0xffff);
+  drawClockNumber(Locator::getDisplay(), _dateTime->getMinute(), 49, 24, 0xffff);
 
   /*if (!_dateTime->is24hFormat())
     Locator::getDisplay()->drawBitmap(55, 18, (_dateTime->isAM() ? AM_SIGN : PM_SIGN), 4, 4, 0xffff);*/
@@ -458,6 +458,16 @@ void Clockface2::drawMap()
 void Clockface2::updateClock() {
 
   Locator::getDisplay()->fillRect(14, 19, 36, 26, 0x0000);
+
+  Locator::getDisplay()->setFont(&Picopixel);
+  Locator::getDisplay()->setTextColor(0xAD55);
+  Locator::getDisplay()->setCursor(15, 41);
+  Locator::getDisplay()->print(monthName(_dateTime->getMonth()));
+  Locator::getDisplay()->print(" ");
+  Locator::getDisplay()->print(_dateTime->getDay());
+  Locator::getDisplay()->print(" ");
+  Locator::getDisplay()->print(weekDayName(_dateTime->getWeekday()));
+
   drawCompactClockTime(Locator::getDisplay(), _dateTime->getHour(), _dateTime->getMinute(), 15, 27, 0xFE40, 2);
 }
 
