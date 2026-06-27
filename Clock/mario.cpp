@@ -43,7 +43,20 @@ void Mario::jump()
     }  
 }
 //***********************************************************************************
-void Mario::idle() 
+void Mario::walk(Direction dir)
+{
+  if (_state == IDLE)
+  {
+    _lastState = _state;
+    _state = WALKING;
+    direction = dir;
+    _walkStartX = _x;
+    _walkStartY = _y;
+    _walkFrame = false;
+  }
+}
+//***********************************************************************************
+void Mario::idle()
 {
   if (_state != IDLE) 
     {
@@ -73,8 +86,36 @@ void Mario::update()
     {
     Locator::getDisplay()->drawRGBBitmap(_x, _y, MARIO_IDLE, MARIO_IDLE_SIZE[0], MARIO_IDLE_SIZE[1]);
     } 
-  else if (_state == JUMPING) 
-    {    
+  else if (_state == WALKING)
+    {
+    if (millis() - lastMillis >= 150)
+      {
+      _walkFrame = !_walkFrame;
+      int bobY = _walkStartY - (_walkFrame ? 2 : 0);
+      Locator::getDisplay()->fillRect(_x, _y, _width, _height, SKY_COLOR);
+      _y = bobY;
+      if (direction == RIGHT)
+        {
+        _x += MARIO_PACE;
+        if (_x >= _walkStartX + MARIO_WALK_DISTANCE) direction = LEFT;
+        }
+      else
+        {
+        _x -= MARIO_PACE;
+        if (_x <= _walkStartX)
+          {
+          _x = _walkStartX;
+          _y = _walkStartY;
+          idle();
+          }
+        }
+      if (_state == WALKING)
+        Locator::getDisplay()->drawRGBBitmap(_x, _y, MARIO_IDLE, MARIO_IDLE_SIZE[0], MARIO_IDLE_SIZE[1]);
+      lastMillis = millis();
+      }
+    }
+  else if (_state == JUMPING)
+    {
     if (millis() - lastMillis >= 50)
       {
       //Serial.println(_y);      

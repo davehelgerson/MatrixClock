@@ -24,6 +24,10 @@ class Mario: public Sprite, public EventTask {
 
     int _lastX;
     int _lastY;
+    int _walkStartX = 0;
+    int _walkStartY = 0;
+    bool _walkFrame = false;
+    static const uint8_t MARIO_WALK_DISTANCE = 6;
 
     const unsigned short* _sprite;
     unsigned long lastMillis = 0;
@@ -37,6 +41,7 @@ class Mario: public Sprite, public EventTask {
     void init();
     void move(Direction dir, int times);
     void jump();
+    void walk(Direction dir);
     void update();
     const char* name();
     void execute(EventType event, Sprite* caller);

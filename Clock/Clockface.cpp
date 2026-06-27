@@ -101,6 +101,7 @@ Block hourBlock3(13, 8);
 Block minuteBlock3(32, 8);
 
 unsigned long lastMillis3 = 0;
+unsigned long lastMillis3Walk = 0;
 int lastMinute;
 
 //Clockface1
@@ -254,6 +255,11 @@ void Clockface3::update() {
     lastMillis3 = millis();
     Serial.println("Update Minute");
     //Serial.println(_dateTime->getFormattedTime());
+  }
+
+  if (_dateTime->getSecond() == 30 && millis() - lastMillis3Walk > 1000) {
+    mario3.walk(RIGHT);
+    lastMillis3Walk = millis();
   }
 }
 
