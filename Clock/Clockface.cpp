@@ -614,25 +614,65 @@ void Clockface4::drawBackground() {
   // Floor strip
   d->fillRect(0, MAPLE_FLOOR_Y, 64, 64 - MAPLE_FLOOR_Y, MAPLE_FLOOR);
 
-  // Moon (positioned between time display and cat zone)
-  d->fillCircle(55, 26, 4, MAPLE_MOON);
+  // Moon: top-left corner (x=0-6 is outside the time-erase rect which starts at x=7)
+  d->fillCircle(3, 12, 3, MAPLE_MOON);
 
-  // Stars (upper strip y=0-3, safe from time-erase at y=4-18)
-  d->drawPixel(4,  2, MAPLE_TIME);
-  d->drawPixel(14, 1, MAPLE_TIME);
-  d->drawPixel(28, 3, MAPLE_TIME);
-  d->drawPixel(44, 1, MAPLE_TIME);
-  // Mid strip y=20-30 (below time, above cat jump zone y=32+)
-  d->drawPixel(8,  21, MAPLE_TIME);
-  d->drawPixel(22, 27, MAPLE_TIME);
-  d->drawPixel(38, 23, MAPLE_TIME);
+  // Stars: upper strip y=0-3 (above time at y=4) -- never erased
+  d->drawPixel(5,  2,  MAPLE_TIME);
+  d->drawPixel(1,  6,  MAPLE_TIME);
+  d->drawPixel(62, 4,  MAPLE_TIME);
+  d->drawPixel(60, 10, MAPLE_TIME);
+  // Mid strip y=28-30: below AM/PM erase zone (y=4-26), above cat jump zone (y=31)
+  d->drawPixel(14, 29, MAPLE_TIME);
+  d->drawPixel(28, 28, MAPLE_TIME);
+  d->drawPixel(42, 30, MAPLE_TIME);
 }
 
 void Clockface4::updateClock() {
   auto* d = Locator::getDisplay();
-  // Erase previous time (scale 3: 5 rows * 3 = 15 tall, ends at y=18)
-  d->fillRect(7, 4, 52, 15, MAPLE_BG);
-  drawCompactClockTime(d, _dateTime->getHour(), _dateTime->getMinute(), 7, 4, MAPLE_TIME, 3);
+
+  // Convert to 12-hour format
+  int h24  = _dateTime->getHour();
+  int h12  = h24 % 12;
+  if (h12 == 0) h12 = 12;
+  bool am  = _dateTime->isAM();
+
+  // Erase time + AM/PM area: y=4 to y=26, x=7 to x=58
+  // Picopixel glyphs render at cursor_y + yOffset (-4) to cursor_y.
+  // Cursor at y=26 -> text pixels at y=22-26, safely below time digits (end y=18).
+  d->fillRect(7, 4, 52, 23, MAPLE_BG);
+
+  // Draw HH:MM (scale 3) then blank the leading-zero for single-digit hours
+  drawCompactClockTime(d, h12, _dateTime->getMinute(), 7, 4, MAPLE_TIME, 3);
+  if (h12 < 10) {
+    d->fillRect(7, 4, 12, 15, MAPLE_BG);  // erase tens digit + gap
+  }
+
+  // AM/PM as pixel-art letters at (45,22), 3×5 each with 1px gap = 7px total wide.
+  // Drawn with fillRect/drawPixel so it's guaranteed to render (same as digits above).
+  const int16_t lx = 45, ly = 22;
+  if (am) {
+    // A:  .X. / X.X / XXX / X.X / X.X
+    d->drawPixel(lx+1, ly,   MAPLE_TIME);
+    d->drawPixel(lx,   ly+1, MAPLE_TIME); d->drawPixel(lx+2, ly+1, MAPLE_TIME);
+    d->fillRect( lx,   ly+2, 3, 1,       MAPLE_TIME);
+    d->drawPixel(lx,   ly+3, MAPLE_TIME); d->drawPixel(lx+2, ly+3, MAPLE_TIME);
+    d->drawPixel(lx,   ly+4, MAPLE_TIME); d->drawPixel(lx+2, ly+4, MAPLE_TIME);
+  } else {
+    // P:  XX. / X.X / XX. / X.. / X..
+    d->fillRect( lx,   ly,   2, 1,       MAPLE_TIME);
+    d->drawPixel(lx,   ly+1, MAPLE_TIME); d->drawPixel(lx+2, ly+1, MAPLE_TIME);
+    d->fillRect( lx,   ly+2, 2, 1,       MAPLE_TIME);
+    d->drawPixel(lx,   ly+3, MAPLE_TIME);
+    d->drawPixel(lx,   ly+4, MAPLE_TIME);
+  }
+  // M:  X.X / XXX / X.X / X.X / X.X  (placed 4px right of A/P)
+  const int16_t mx = lx + 4;
+  d->drawPixel(mx,   ly,   MAPLE_TIME); d->drawPixel(mx+2, ly,   MAPLE_TIME);
+  d->fillRect( mx,   ly+1, 3, 1,       MAPLE_TIME);
+  d->drawPixel(mx,   ly+2, MAPLE_TIME); d->drawPixel(mx+2, ly+2, MAPLE_TIME);
+  d->drawPixel(mx,   ly+3, MAPLE_TIME); d->drawPixel(mx+2, ly+3, MAPLE_TIME);
+  d->drawPixel(mx,   ly+4, MAPLE_TIME); d->drawPixel(mx+2, ly+4, MAPLE_TIME);
 }
 
 void Clockface4::update() {

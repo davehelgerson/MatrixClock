@@ -13,10 +13,10 @@ const uint16_t MAPLE_FLOOR = 0x2082;  // dark brownish-gray floor
 const uint16_t MAPLE_TIME  = 0xFFFF;  // white time display
 
 const uint8_t  MAPLE_CAT_W       = 10;
-const uint8_t  MAPLE_CAT_H       = 12;
+const uint8_t  MAPLE_CAT_H       = 13;
 const uint8_t  MAPLE_JUMP_HEIGHT = 12;
 
-const int16_t MAPLE_CAT_GROUND_Y = 44;
+const int16_t MAPLE_CAT_GROUND_Y = 43;  // paws land at y+13 = 56 (floor)
 const int16_t MAPLE_FLOOR_Y      = 56;
 
 const uint16_t MAPLE_WALK_SPEED = 100;

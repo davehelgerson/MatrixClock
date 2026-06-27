@@ -12,10 +12,10 @@ void MapleCat::init() {
 
 void MapleCat::walk(Direction dir) {
     if (_state != SITTING) return;
-    _walkDir = dir;
-    _state   = WALKING;
+    _walkDir   = dir;
+    _state     = WALKING;
     _walkFrame = false;
-    _targetX = (dir == RIGHT) ? (64 - MAPLE_CAT_W - 4) : 4;
+    _targetX   = (dir == RIGHT) ? (64 - MAPLE_CAT_W - 4) : 4;
 }
 
 void MapleCat::jump() {
@@ -29,68 +29,81 @@ void MapleCat::erase() {
     auto* d = Locator::getDisplay();
     int16_t clearX = _lastX - 5;
     if (clearX < 0) clearX = 0;
-    const int16_t clearW = MAPLE_CAT_W + 10;
+    const int16_t clearW = MAPLE_CAT_W + 12;
 
-    // Clear sky portion (cat top down to floor)
     int16_t skyH = MAPLE_FLOOR_Y - _lastY;
     if (skyH > 0)
         d->fillRect(clearX, _lastY, clearW, skyH, MAPLE_BG);
 
-    // Restore floor strip
     d->fillRect(clearX, MAPLE_FLOOR_Y, clearW, 64 - MAPLE_FLOOR_Y, MAPLE_FLOOR);
 }
 
 void MapleCat::drawAt(int16_t x, int16_t y) {
     auto* d = Locator::getDisplay();
 
-    // Ear tips (two single pixels)
-    d->drawPixel(x + 1, y,     MAPLE_CAT);
-    d->drawPixel(x + 6, y,     MAPLE_CAT);
-    // Ear bases
-    d->fillRect(x,     y + 1, 3, 1, MAPLE_CAT);
-    d->fillRect(x + 5, y + 1, 3, 1, MAPLE_CAT);
+    // EARS: triangular -- single tip pixel widens to 3-pixel base
+    d->drawPixel(x + 2, y,     MAPLE_CAT);
+    d->drawPixel(x + 7, y,     MAPLE_CAT);
+    d->fillRect(x + 1, y + 1, 3, 1, MAPLE_CAT);
+    d->fillRect(x + 6, y + 1, 3, 1, MAPLE_CAT);
 
-    // Head block (rows 2–5)
-    d->fillRect(x, y + 2, 8, 4, MAPLE_CAT);
-    // Green eyes on head row 1 (y+3)
-    d->drawPixel(x + 1, y + 3, MAPLE_EYE);
-    d->drawPixel(x + 6, y + 3, MAPLE_EYE);
+    // HEAD: 10 wide (wider than body for cat proportions)
+    d->fillRect(x, y + 2, 10, 3, MAPLE_CAT);
+    d->drawPixel(x + 2, y + 3, MAPLE_EYE);
+    d->drawPixel(x + 7, y + 3, MAPLE_EYE);
 
-    // Body block (rows 6–9)
-    d->fillRect(x, y + 6, 8, 4, MAPLE_CAT);
+    // CHIN: tapers 10 -> 8
+    d->fillRect(x + 1, y + 5, 8, 1, MAPLE_CAT);
 
-    // State-specific lower body
+    // NECK: narrows to 6 wide, creates visible head/body distinction
+    d->fillRect(x + 2, y + 6, 6, 1, MAPLE_CAT);
+
+    // BODY: 8 wide, 4 rows
+    d->fillRect(x + 1, y + 7, 8, 4, MAPLE_CAT);
+
     switch (_state) {
         case SITTING:
-            // Front paws tucked under body
-            d->fillRect(x,     y + 10, 2, 2, MAPLE_CAT);
-            d->fillRect(x + 6, y + 10, 2, 2, MAPLE_CAT);
-            // Tail curled out to the left
-            d->fillRect(x - 3, y + 11, 4, 1, MAPLE_CAT);
+            // Two front paws tucked below body
+            d->fillRect(x + 1, y + 11, 2, 2, MAPLE_CAT);
+            d->fillRect(x + 7, y + 11, 2, 2, MAPLE_CAT);
+            // Tail curls left: horizontal run then tip drops down
+            d->fillRect(x - 3, y + 10, 4, 1, MAPLE_CAT);
+            d->drawPixel(x - 3, y + 11, MAPLE_CAT);
             break;
 
         case WALKING:
-            // Alternating legs (2-frame animation)
+            // Four legs: front pair (x+1, x+3) and rear pair (x+5, x+7)
+            // Diagonal gait: front-left + rear-right move together
             if (_walkFrame) {
-                d->fillRect(x + 1, y + 10, 1, 3, MAPLE_CAT); // left leg forward
-                d->fillRect(x + 6, y + 10, 1, 2, MAPLE_CAT); // right leg back
+                d->fillRect(x + 1, y + 11, 1, 3, MAPLE_CAT);
+                d->fillRect(x + 3, y + 11, 1, 2, MAPLE_CAT);
+                d->fillRect(x + 5, y + 11, 1, 2, MAPLE_CAT);
+                d->fillRect(x + 7, y + 11, 1, 3, MAPLE_CAT);
             } else {
-                d->fillRect(x + 1, y + 10, 1, 2, MAPLE_CAT); // left leg back
-                d->fillRect(x + 6, y + 10, 1, 3, MAPLE_CAT); // right leg forward
+                d->fillRect(x + 1, y + 11, 1, 2, MAPLE_CAT);
+                d->fillRect(x + 3, y + 11, 1, 3, MAPLE_CAT);
+                d->fillRect(x + 5, y + 11, 1, 3, MAPLE_CAT);
+                d->fillRect(x + 7, y + 11, 1, 2, MAPLE_CAT);
             }
-            // Tail raised while walking
-            d->drawPixel(x - 1, y + 9, MAPLE_CAT);
-            d->drawPixel(x - 1, y + 8, MAPLE_CAT);
-            d->drawPixel(x - 2, y + 7, MAPLE_CAT);
+            // Tail raised in gentle arc
+            d->drawPixel(x - 1, y + 10, MAPLE_CAT);
+            d->drawPixel(x - 1, y + 9,  MAPLE_CAT);
+            d->drawPixel(x - 2, y + 8,  MAPLE_CAT);
+            d->drawPixel(x - 2, y + 7,  MAPLE_CAT);
+            d->drawPixel(x - 3, y + 6,  MAPLE_CAT);
             break;
 
         case JUMPING:
-            // Paws extended out to sides
-            d->fillRect(x - 2, y + 9, 3, 1, MAPLE_CAT);
-            d->fillRect(x + 8, y + 9, 3, 1, MAPLE_CAT);
-            // Tail arching up
-            d->drawPixel(x - 1, y + 8, MAPLE_CAT);
-            d->drawPixel(x - 2, y + 6, MAPLE_CAT);
+            // All four legs extended straight down
+            d->fillRect(x + 1, y + 11, 1, 3, MAPLE_CAT);
+            d->fillRect(x + 3, y + 11, 1, 3, MAPLE_CAT);
+            d->fillRect(x + 5, y + 11, 1, 3, MAPLE_CAT);
+            d->fillRect(x + 7, y + 11, 1, 3, MAPLE_CAT);
+            // Tail arches up and over
+            d->drawPixel(x - 1, y + 9,  MAPLE_CAT);
+            d->drawPixel(x - 2, y + 7,  MAPLE_CAT);
+            d->drawPixel(x - 3, y + 5,  MAPLE_CAT);
+            d->drawPixel(x - 3, y + 4,  MAPLE_CAT);
             break;
     }
 }
@@ -124,9 +137,9 @@ void MapleCat::update() {
         } else {
             _y += 2;
             if (_y >= _jumpBaseY) {
-                _y        = _jumpBaseY;
-                _state    = SITTING;
-                _jumpDir  = UP;
+                _y       = _jumpBaseY;
+                _state   = SITTING;
+                _jumpDir = UP;
             }
         }
     }
