@@ -1,12 +1,11 @@
 #include "CWDateTime.h"
+#include "WifiConfig.h"
 #include <Arduino.h>
 #include "../hardware/pin_config.h"
 #include "../hardware/I2CBus.h"
 #include <WiFi.h>
 #include <time.h>
 
-const char* ssid = "HWIFI_LAB";
-const char* password = "TestTest1";
 const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = -18000;  // UTC-5 for EST, adjust for your timezone
 const int daylightOffset_sec = 3600;
@@ -15,6 +14,40 @@ static const unsigned long WIFI_CONNECT_TIMEOUT_MS = 15000UL;
 static const unsigned long RTC_RESYNC_INTERVAL_MS  = 30000UL;
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+bool CWDateTime::syncTimeNtp()
+{
+  if (WiFi.status() != WL_CONNECTED) {
+    return false;
+  }
+
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo, 5000)) {
+    Serial.println("NTP failed, using existing RTC time");
+    return false;
+  }
+
+  DateTime synced(
+    timeinfo.tm_year + 1900,
+    timeinfo.tm_mon + 1,
+    timeinfo.tm_mday,
+    timeinfo.tm_hour,
+    timeinfo.tm_min,
+    timeinfo.tm_sec
+  );
+
+  {
+    I2CBus::Guard guard;
+    rtc.adjust(synced);
+  }
+
+  _cachedUnixTime = synced.unixtime();
+  _lastSyncMillis = millis();
+  Serial.println("RTC set from NTP");
+  return true;
+}
 
 void CWDateTime::begin()
 {
@@ -32,9 +65,15 @@ void CWDateTime::begin()
     }
   }
 
+  String ssid;
+  String password;
+  WifiConfig::load(ssid, password);
+
   // Connect to WiFi with timeout so offline boot still uses RTC time
   Serial.print("Connecting to WiFi");
-  WiFi.begin(ssid, password);
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid.c_str(), password.c_str());
   unsigned long wifiStart = millis();
   while (WiFi.status() != WL_CONNECTED && (millis() - wifiStart) < WIFI_CONNECT_TIMEOUT_MS) {
     delay(500);
@@ -43,25 +82,7 @@ void CWDateTime::begin()
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println(" connected");
-
-    // Sync time from NTP
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-
-    struct tm timeinfo;
-    if (getLocalTime(&timeinfo)) {
-      I2CBus::Guard guard;
-      rtc.adjust(DateTime(
-        timeinfo.tm_year + 1900,
-        timeinfo.tm_mon + 1,
-        timeinfo.tm_mday,
-        timeinfo.tm_hour,
-        timeinfo.tm_min,
-        timeinfo.tm_sec
-      ));
-      Serial.println("RTC set from NTP");
-    } else {
-      Serial.println("NTP failed, using existing RTC time");
-    }
+    syncTimeNtp();
   } else {
     Serial.println(" WiFi timeout, using existing RTC time");
   }

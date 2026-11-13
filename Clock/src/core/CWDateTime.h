@@ -15,6 +15,7 @@ class CWDateTime
 
   public:
     void begin();
+    bool syncTimeNtp();
 
     char *getHour(const char *format);
     char *getMinute(const char *format);

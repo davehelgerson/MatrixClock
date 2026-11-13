@@ -109,11 +109,12 @@ void ClockApp::initMatrix()
 
 void ClockApp::initClockfaces()
 {
-  _clockfaces[0] = new Clockface3(_dmaDisplay); // Mario
-  _clockfaces[1] = new Clockface2(_dmaDisplay); // Pacman
-  _clockfaces[2] = new Clockface1(_dmaDisplay); // Pokedex
-  _clockfaces[3] = new Clockface4(_dmaDisplay); // Maple
-  _clockfaces[4] = new Clockface5(_dmaDisplay); // Dad
+  _clockfaces[0] = new Clockface3(_dmaDisplay);     // Mario
+  _clockfaces[1] = new Clockface2(_dmaDisplay);     // Pacman
+  _clockfaces[2] = new Clockface1(_dmaDisplay);     // Pokedex
+  _clockfaces[3] = new Clockface4(_dmaDisplay);     // Maple
+  _clockfaces[4] = new Clockface5(_dmaDisplay);     // Dad
+  _clockfaces[5] = new WifiClockface(_dmaDisplay);  // WIFI
 
   _clockfaces[0]->setup(&_dateTime);
 }
@@ -144,8 +145,11 @@ void ClockApp::runTimeTask()
     if (targetIndex != activeIndex) {
       vTaskDelay(pdMS_TO_TICKS(150));
       targetIndex = _gifIndex;
-      activeIndex = targetIndex;
-      _clockfaces[activeIndex]->setup(&_dateTime);
+      if (targetIndex != activeIndex) {
+        _clockfaces[activeIndex]->teardown();
+        activeIndex = targetIndex;
+        _clockfaces[activeIndex]->setup(&_dateTime);
+      }
     }
     _clockfaces[activeIndex]->update();
     vTaskDelay(pdMS_TO_TICKS(5));

@@ -26,7 +26,14 @@ namespace {
     "You make me happy every day!",
     "You're braver than you know!",
     "I'm so happy that you are my son!",
-    "I'm here for you!"
+    "I'm here for you!",
+    "I'm lucky to be your dad!",
+    "I love adventures with you!",
+    "Your smile brightens my day!",
+    "Remember to always be kind!",
+    "I'm always cheering for you!",
+    "Thank you for being you!",
+    "You are couragous and strong!"
   };
   const uint8_t  DAD_MSG_COUNT     = sizeof(DAD_MESSAGES) / sizeof(DAD_MESSAGES[0]);
   const uint8_t  DAD_TEXT_SCALE    = 1;

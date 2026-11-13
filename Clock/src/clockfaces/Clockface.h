@@ -6,6 +6,7 @@
 #include "PacmanClockface.h"
 #include "MapleClockface.h"
 #include "DadClockface.h"
+#include "WifiClockface.h"
 
 #endif
 

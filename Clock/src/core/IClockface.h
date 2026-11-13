@@ -8,6 +8,7 @@ class IClockface {
     virtual ~IClockface() = default;
     virtual void setup(CWDateTime *dateTime) = 0;
     virtual void update() = 0;
+    virtual void teardown() {}
 };
 
 #endif
