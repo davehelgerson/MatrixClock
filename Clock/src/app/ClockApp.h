@@ -19,6 +19,8 @@ class ClockApp {
     void IRAM_ATTR onEncoderEdge();
     void flushDisplay(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p);
     void readTouchpad(lv_indev_drv_t *indev_driver, lv_indev_data_t *data);
+    void setTftRotation(uint8_t rotation);
+    void setPowerTimeouts(uint16_t dimMinutes, uint16_t offMinutes);
 
   private:
     static const uint16_t TFT_WIDTH  = 240;
@@ -48,6 +50,10 @@ class ClockApp {
     volatile bool _screenSleeping = false;
     volatile bool _screenDimmed = false;
     volatile bool _wakeRequested = false;
+    volatile uint8_t _tftRotation = 3;
+    volatile bool _rotationDirty = false;
+    volatile uint16_t _dimMinutes = 5;
+    volatile uint16_t _offMinutes = 15;
 
     void initPins();
     void initTft();

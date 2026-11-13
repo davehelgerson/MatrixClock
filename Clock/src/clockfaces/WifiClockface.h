@@ -9,17 +9,23 @@
 #include "../core/CWDateTime.h"
 
 /**
- * Clockface/mode for the WIFI menu option.
+ * Clockface/mode for the Settings menu option.
  * Turns on a SoftAP + captive-portal web server when active so the user can
- * scan nearby WiFi networks, enter a password, and save home WiFi credentials
- * to NVS, and turns the WiFi radio completely off on teardown().
+ * configure home WiFi credentials and menu dial display rotation in NVS, and
+ * turns the WiFi radio completely off on teardown().
  */
 class WifiClockface : public IClockface {
+  public:
+    using RotationCallback = void (*)(uint8_t);
+    using PowerTimeoutCallback = void (*)(uint16_t, uint16_t);
+
   private:
     static constexpr const char *AP_SSID = "MatrixWiFi";
 
     Adafruit_GFX *_display;
     CWDateTime *_dateTime = nullptr;
+    RotationCallback _onRotationChanged = nullptr;
+    PowerTimeoutCallback _onPowerTimeoutsChanged = nullptr;
     std::unique_ptr<WebServer> _server;
     std::unique_ptr<DNSServer> _dnsServer;
 
@@ -35,6 +41,7 @@ class WifiClockface : public IClockface {
     void handleRoot();
     void handleScan();
     void handleSave();
+    void handleDisplay();
     void handleNotFound();
 
     void drawScreen();
@@ -47,7 +54,9 @@ class WifiClockface : public IClockface {
     static String buildScanJson();
 
   public:
-    WifiClockface(Adafruit_GFX *display);
+    WifiClockface(Adafruit_GFX *display,
+                  RotationCallback onRotationChanged = nullptr,
+                  PowerTimeoutCallback onPowerTimeoutsChanged = nullptr);
     ~WifiClockface() override;
 
     void setup(CWDateTime *dateTime) override;

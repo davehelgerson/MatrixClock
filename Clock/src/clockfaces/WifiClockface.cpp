@@ -32,12 +32,14 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MatrixClock WiFi Setup</title>
+<title>MatrixClock Settings</title>
 <style>
   *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
   body{margin:0;padding:16px;background:#0f172a;color:#e2e8f0;display:flex;justify-content:center}
-  .card{width:100%;max-width:420px;background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;box-shadow:0 10px 25px rgba(0,0,0,.35)}
+  .stack{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px}
+  .card{width:100%;background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;box-shadow:0 10px 25px rgba(0,0,0,.35)}
   h1{margin:0 0 6px;font-size:1.25rem;color:#38bdf8}
+  h2{margin:0 0 8px;font-size:1.05rem;color:#38bdf8}
   p.sub{margin:0 0 16px;font-size:.9rem;color:#94a3b8}
   .saved{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:.88rem}
   label{display:block;font-size:.85rem;color:#cbd5e1;margin:12px 0 6px}
@@ -53,8 +55,9 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 </style>
 </head>
 <body>
+<div class="stack">
 <div class="card">
-  <h1>MatrixClock WiFi</h1>
+  <h1>MatrixClock Settings</h1>
   <p class="sub">Select your home WiFi network and save credentials.</p>
   <div class="saved">Saved network: <strong id="savedSsid">__SAVED_SSID__</strong></div>
   <form method="POST" action="/save">
@@ -74,8 +77,31 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     <input id="password" name="password" type="password" maxlength="64" placeholder="Leave blank if open network">
     <label class="chk"><input type="checkbox" onclick="document.getElementById('password').type=this.checked?'text':'password'"> Show password</label>
 
-    <button type="submit" class="btn">Save &amp; Test Connection</button>
+    <button type="submit" class="btn">Save &amp; Test WiFi</button>
   </form>
+</div>
+
+<div class="card">
+  <h2>Display &amp; Power</h2>
+  <p class="sub">Rotate the menu dial or adjust idle dim and display off timers.</p>
+  <form method="POST" action="/display">
+    <label for="rotation">Menu Dial Rotation</label>
+    <select id="rotation" name="rotation">
+      <option value="3"__ROT_3__>0&deg; (Default)</option>
+      <option value="0"__ROT_0__>90&deg; Clockwise</option>
+      <option value="1"__ROT_1__>180&deg; (Upside Down)</option>
+      <option value="2"__ROT_2__>270&deg; Clockwise</option>
+    </select>
+
+    <label for="dimMinutes">Dim Clock After (1&ndash;720 min)</label>
+    <input id="dimMinutes" name="dimMinutes" type="number" min="0" max="720" required value="__DIM_MIN__">
+
+    <label for="offMinutes">Turn Display Off After (1&ndash;720 min)</label>
+    <input id="offMinutes" name="offMinutes" type="number" min="0" max="720" required value="__OFF_MIN__">
+
+    <button type="submit" class="btn">Apply &amp; Save Settings</button>
+  </form>
+</div>
 </div>
 <script>
 function pickNetwork(val){
@@ -117,8 +143,12 @@ loadScan(false);
 </html>)rawliteral";
 }
 
-WifiClockface::WifiClockface(Adafruit_GFX *display)
-  : _display(display)
+WifiClockface::WifiClockface(Adafruit_GFX *display,
+                             RotationCallback onRotationChanged,
+                             PowerTimeoutCallback onPowerTimeoutsChanged)
+  : _display(display),
+    _onRotationChanged(onRotationChanged),
+    _onPowerTimeoutsChanged(onPowerTimeoutsChanged)
 {
 }
 
@@ -135,7 +165,7 @@ void WifiClockface::setup(CWDateTime *dateTime)
   _active = true;
   _animFrame = 0;
   _lastAnimMillis = 0;
-  _statusLine = "WIFI: ON";
+  _statusLine = "SETTINGS";
   _statusColor = COLOR_GREEN;
   _dirtyDisplay = true;
 
@@ -154,6 +184,7 @@ void WifiClockface::setup(CWDateTime *dateTime)
   _server->on("/", HTTP_GET, [this]() { handleRoot(); });
   _server->on("/scan", HTTP_GET, [this]() { handleScan(); });
   _server->on("/save", HTTP_POST, [this]() { handleSave(); });
+  _server->on("/display", HTTP_POST, [this]() { handleDisplay(); });
   _server->onNotFound([this]() { handleNotFound(); });
   _server->begin();
 
@@ -222,6 +253,14 @@ void WifiClockface::handleRoot()
   String savedLabel = (_savedSsid.length() > 0) ? escapeHtml(_savedSsid) : String("Not configured");
   html.replace("__SAVED_SSID__", savedLabel);
   html.replace("__SAVED_SSID_ATTR__", escapeHtml(_savedSsid));
+
+  uint8_t rot = WifiConfig::loadTftRotation();
+  html.replace("__ROT_3__", (rot == 3) ? " selected" : "");
+  html.replace("__ROT_0__", (rot == 0) ? " selected" : "");
+  html.replace("__ROT_1__", (rot == 1) ? " selected" : "");
+  html.replace("__ROT_2__", (rot == 2) ? " selected" : "");
+  html.replace("__DIM_MIN__", String(WifiConfig::loadDimMinutes()));
+  html.replace("__OFF_MIN__", String(WifiConfig::loadOffMinutes()));
 
   _server->send(200, "text/html", html);
 }
@@ -309,11 +348,95 @@ void WifiClockface::handleSave()
   } else {
     page += "<h2 style='color:#fbbf24;margin-top:0'>Credentials Saved</h2>";
     page += "<p>Saved network: <strong>" + escapeHtml(ssid) + "</strong></p>";
-    page += "<p>Could not confirm connection within 8 seconds. Double-check the password or switch away from WIFI when done.</p>";
+    page += "<p>Could not confirm connection within 8 seconds. Double-check the password or switch away from Settings when done.</p>";
   }
 
   page += "<p style='color:#94a3b8;font-size:.9rem'>Turn the dial to any clock face when finished to turn off the WiFi antenna.</p>";
-  page += "<a href='/'>Back to WiFi Setup</a></div></body></html>";
+  page += "<a href='/'>Back to Settings</a></div></body></html>";
+
+  _server->send(200, "text/html", page);
+}
+
+namespace {
+bool parseNonNegativeIntArg(WebServer &server, const char *name, int maxVal, int &outVal)
+{
+  if (!server.hasArg(name)) {
+    return false;
+  }
+  String raw = server.arg(name);
+  raw.trim();
+  if (raw.length() == 0) {
+    return false;
+  }
+  for (size_t i = 0; i < raw.length(); ++i) {
+    if (!isDigit(raw[i])) {
+      return false;
+    }
+  }
+  long val = raw.toInt();
+  if (val < 0 || val > maxVal) {
+    return false;
+  }
+  outVal = static_cast<int>(val);
+  return true;
+}
+} // namespace
+
+void WifiClockface::handleDisplay()
+{
+  int rot = -1;
+  int dimMin = -1;
+  int offMin = -1;
+
+  bool rotOk = parseNonNegativeIntArg(*_server, "rotation", 3, rot);
+  bool dimOk = parseNonNegativeIntArg(*_server, "dimMinutes", WifiConfig::MAX_TIMEOUT_MINUTES, dimMin);
+  bool offOk = parseNonNegativeIntArg(*_server, "offMinutes", WifiConfig::MAX_TIMEOUT_MINUTES, offMin);
+
+  if (!rotOk || !dimOk || !offOk ||
+      !WifiConfig::saveTftRotation(static_cast<uint8_t>(rot)) ||
+      !WifiConfig::savePowerTimeouts(static_cast<uint16_t>(dimMin), static_cast<uint16_t>(offMin))) {
+    _server->send(400, "text/html",
+      "<html><body style='font-family:sans-serif;background:#0f172a;color:#f87171;padding:20px'>"
+      "<h2>Invalid Settings</h2><p>Please enter valid values (1 to 720 minutes).</p>"
+      "<a href='/' style='color:#38bdf8'>Back</a></body></html>");
+    return;
+  }
+
+  uint16_t normalizedDim = WifiConfig::normalizeTimeoutMinutes(static_cast<uint16_t>(dimMin));
+  uint16_t normalizedOff = WifiConfig::normalizeTimeoutMinutes(static_cast<uint16_t>(offMin));
+
+  if (_onRotationChanged) {
+    _onRotationChanged(static_cast<uint8_t>(rot));
+  }
+  if (_onPowerTimeoutsChanged) {
+    _onPowerTimeoutsChanged(normalizedDim, normalizedOff);
+  }
+
+  _statusLine = "SAVED";
+  _statusColor = COLOR_GREEN;
+  _dirtyDisplay = true;
+
+  const char *degLabel = "0&deg; (Default)";
+  if (rot == 0) degLabel = "90&deg; Clockwise";
+  else if (rot == 1) degLabel = "180&deg; (Upside Down)";
+  else if (rot == 2) degLabel = "270&deg; Clockwise";
+
+  String dimLabel = String(normalizedDim) + " min";
+  String offLabel = String(normalizedOff) + " min";
+
+  String page = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+                "<title>Settings Saved</title>"
+                "<style>body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;display:flex;justify-content:center}"
+                ".card{max-width:420px;width:100%;background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px}"
+                "a{display:inline-block;margin-top:16px;padding:10px 14px;background:#0284c7;color:#fff;text-decoration:none;border-radius:8px}</style>"
+                "</head><body><div class='card'>"
+                "<h2 style='color:#4ade80;margin-top:0'>Display &amp; Power Saved</h2>"
+                "<p>Dial orientation: <strong>" + String(degLabel) + "</strong></p>"
+                "<p>Dim clock after: <strong>" + dimLabel + "</strong></p>"
+                "<p>Turn display off after: <strong>" + offLabel + "</strong></p>"
+                "<p style='color:#94a3b8;font-size:.9rem'>Changes applied immediately and saved permanently across reboots.</p>"
+                "<a href='/'>Back to Settings</a></div></body></html>";
 
   _server->send(200, "text/html", page);
 }
