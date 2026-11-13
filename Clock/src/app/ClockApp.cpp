@@ -313,11 +313,20 @@ void ClockApp::updateUiWidgets()
   int curGif = _gifIndex;
   int curBrightness = _brightness;
 
-  if (curPage == 0 && (curPage != lastPage || curGif != lastGif)) {
-    lv_anim_enable_t anim = (curPage != lastPage) ? LV_ANIM_OFF : LV_ANIM_ON;
-    lv_roller_set_selected(ui_Roller1, curGif, anim);
-    lastGif = curGif;
-    lastPage = curPage;
+  if (curPage == 0) {
+    bool needsSync = (curPage != lastPage) || (curGif != lastGif) ||
+                     (static_cast<int>(lv_roller_get_selected(ui_Roller1)) != curGif);
+    if (needsSync) {
+      if (curPage == lastPage && lastGif >= 0 && curGif != lastGif) {
+        // Re-center the infinite roller on its middle page before starting a new
+        // animation so rapid turns cannot drift into LVGL's edge-page clamp/underflow.
+        lv_roller_set_selected(ui_Roller1, lastGif, LV_ANIM_OFF);
+      }
+      lv_anim_enable_t anim = (curPage != lastPage) ? LV_ANIM_OFF : LV_ANIM_ON;
+      lv_roller_set_selected(ui_Roller1, curGif, anim);
+      lastGif = curGif;
+      lastPage = curPage;
+    }
   } else if (curPage == 1 && (curPage != lastPage || curBrightness != lastBrightness)) {
     char temp[16] = "";
     lv_arc_set_value(ui_Arc1, curBrightness);
