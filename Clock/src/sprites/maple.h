@@ -1,8 +1,8 @@
 #ifndef Maple_h
 #define Maple_h
 
-#include "Game.h"
-#include "Locator.h"
+#include "../core/Game.h"
+#include "../core/Locator.h"
 
 // Night scene palette
 const uint16_t MAPLE_BG    = 0x080F;  // dark navy night sky

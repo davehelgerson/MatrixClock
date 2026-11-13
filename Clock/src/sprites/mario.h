@@ -1,10 +1,10 @@
 #ifndef Mario_h
 #define Mario_h
 
-#include "Game.h"
-#include "Locator.h"
-#include "EventBus.h"
-#include "assets.h"
+#include "../core/Game.h"
+#include "../core/Locator.h"
+#include "../core/EventBus.h"
+#include "../assets/assets.h"
 
 
 const uint8_t MARIO_PACE = 3;

@@ -2,12 +2,16 @@
 #define CWDateTimeCf_h
 
 #include <Arduino.h>
-#include "RTClib.h"
+#include <RTClib.h>
 
 class CWDateTime
 {
   private:
     RTC_PCF8563 rtc;
+    uint32_t _cachedUnixTime = 0;
+    unsigned long _lastSyncMillis = 0;
+
+    DateTime now();
 
   public:
     void begin();
@@ -24,6 +28,6 @@ class CWDateTime
 
     int getDay();
     int getMonth();
-
 };
+
 #endif

@@ -1,10 +1,10 @@
 #ifndef BlockSprite_h
 #define BlockSprite_h
 
-#include "Game.h"
-#include "Locator.h"
-#include "EventTask.h"
-#include "assets.h"
+#include "../core/Game.h"
+#include "../core/Locator.h"
+#include "../core/EventTask.h"
+#include "../assets/assets.h"
 
 const uint8_t MOVE_PACE = 2;
 const uint8_t MAX_MOVE_HEIGHT = 4;

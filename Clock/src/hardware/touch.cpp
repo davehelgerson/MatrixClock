@@ -1,9 +1,13 @@
 #include "touch.h"
+#include "I2CBus.h"
 
 int read_touch(int *x, int *y)
 {
     byte data_raw[7];
-    i2c_read(0x15, 0x02, data_raw, 7);
+    if (i2c_read(0x15, 0x02, data_raw, 7) != 0)
+    {
+        return 0;
+    }
 
     int event = data_raw[1] >> 6;
 
@@ -32,12 +36,16 @@ int read_touch(int *x, int *y)
 
 int i2c_read(uint16_t addr, uint8_t reg_addr, uint8_t *reg_data, uint32_t length)
 {
+    I2CBus::Guard guard;
+    if (!guard.locked())
+        return -1;
+
     Wire.beginTransmission(addr);
     Wire.write(reg_addr);
     if (Wire.endTransmission(true))
         return -1;
     Wire.requestFrom(addr, length, true);
-    for (int i = 0; i < length; i++)
+    for (uint32_t i = 0; i < length; i++)
     {
         *reg_data++ = Wire.read();
     }
@@ -46,9 +54,13 @@ int i2c_read(uint16_t addr, uint8_t reg_addr, uint8_t *reg_data, uint32_t length
 
 int i2c_write(uint8_t addr, uint8_t reg_addr, const uint8_t *reg_data, uint32_t length)
 {
+    I2CBus::Guard guard;
+    if (!guard.locked())
+        return -1;
+
     Wire.beginTransmission(addr);
     Wire.write(reg_addr);
-    for (int i = 0; i < length; i++)
+    for (uint32_t i = 0; i < length; i++)
     {
         Wire.write(*reg_data++);
     }

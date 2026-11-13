@@ -1,5 +1,5 @@
 #include "block.h"
-#include "Super_Mario_Bros__24pt7b.h"
+#include "../fonts/Super_Mario_Bros__24pt7b.h"
 
 //String &Block::_text;
 String secondsText;
