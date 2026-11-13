@@ -19,33 +19,37 @@ namespace {
   const int SETTINGS_FACE_INDEX = 5;
 
   enum EncoderState : uint8_t {
-    ENC_START_00 = 0,
-    ENC_CW_00    = 1,
-    ENC_CCW_00   = 2,
-    ENC_START_11 = 3,
-    ENC_CW_11    = 4,
-    ENC_CCW_11   = 5
+    ENC_START     = 0,
+    ENC_CW_BEGIN  = 1,
+    ENC_CW_NEXT   = 2,
+    ENC_CW_FINAL  = 3,
+    ENC_CCW_BEGIN = 4,
+    ENC_CCW_NEXT  = 5,
+    ENC_CCW_FINAL = 6
   };
 
-  // Buxton half-step quadrature transition tables indexed by [state][ab],
-  // where ab = (CLK << 1) | DT. Monitoring both pins cancels mechanical
-  // contact bounce cleanly without skipping or reversing steps.
-  DRAM_ATTR const uint8_t ENCODER_NEXT_STATE[6][4] = {
-    {ENC_START_00, ENC_CW_00,  ENC_CCW_00, ENC_START_11},
-    {ENC_START_00, ENC_CW_00,  ENC_CCW_00, ENC_START_11},
-    {ENC_START_00, ENC_CW_00,  ENC_CCW_00, ENC_START_11},
-    {ENC_START_00, ENC_CCW_11, ENC_CW_11,  ENC_START_11},
-    {ENC_START_00, ENC_CCW_11, ENC_CW_11,  ENC_START_11},
-    {ENC_START_00, ENC_CCW_11, ENC_CW_11,  ENC_START_11}
+  // Buxton full-step quadrature transition tables indexed by [state][ab],
+  // emitting +/-1 only once per complete 4-phase detent cycle so one physical
+  // bump moves exactly one menu item and contact bounce is ignored.
+  DRAM_ATTR const uint8_t ENCODER_NEXT_STATE[7][4] = {
+    // 00         01             10             11
+    {ENC_START,   ENC_CCW_BEGIN, ENC_CW_BEGIN,  ENC_START}, // ENC_START
+    {ENC_CW_NEXT, ENC_START,     ENC_CW_BEGIN,  ENC_START}, // ENC_CW_BEGIN
+    {ENC_CW_NEXT, ENC_CW_FINAL,  ENC_CW_BEGIN,  ENC_START}, // ENC_CW_NEXT
+    {ENC_CW_NEXT, ENC_CW_FINAL,  ENC_START,     ENC_START}, // ENC_CW_FINAL  -> 11 emits +1
+    {ENC_CCW_NEXT,ENC_CCW_BEGIN, ENC_START,     ENC_START}, // ENC_CCW_BEGIN
+    {ENC_CCW_NEXT,ENC_CCW_BEGIN, ENC_CCW_FINAL, ENC_START}, // ENC_CCW_NEXT
+    {ENC_CCW_NEXT,ENC_START,     ENC_CCW_FINAL, ENC_START}  // ENC_CCW_FINAL -> 11 emits -1
   };
 
-  DRAM_ATTR const int8_t ENCODER_STEP[6][4] = {
-    {  0,  0,  0,  0},
-    {  0,  0,  0,  1},
-    {  0,  0,  0, -1},
-    {  0,  0,  0,  0},
-    {  1,  0,  0,  0},
-    { -1,  0,  0,  0}
+  DRAM_ATTR const int8_t ENCODER_STEP[7][4] = {
+    {0, 0, 0,  0},
+    {0, 0, 0,  0},
+    {0, 0, 0,  0},
+    {0, 0, 0,  1},
+    {0, 0, 0,  0},
+    {0, 0, 0,  0},
+    {0, 0, 0, -1}
   };
 
   inline uint8_t IRAM_ATTR readEncoderAb() {
@@ -71,8 +75,9 @@ namespace {
     clockApp.readTouchpad(indev_driver, data);
   }
 
-  void IRAM_ATTR encoderIsrThunk() {
-    clockApp.onEncoderEdge();
+  void encoderTimerThunk(void *arg) {
+    (void)arg;
+    clockApp.pollEncoder();
   }
 
   void tftTaskThunk(void *pvParameters) {
@@ -122,10 +127,20 @@ void ClockApp::initPins()
   pinMode(ENCODER_DT, INPUT_PULLUP);
 
   uint8_t ab = readEncoderAb();
-  _encoderState = (ab == 0) ? ENC_START_00 : ENC_START_11;
+  _encoderMask = (ab == 0) ? 0x03U : 0x00U;
+  _lastRawAb = ab ^ _encoderMask;
+  _debouncedAb = _lastRawAb;
+  _rawStableCount = 2;
+  _encoderState = ENC_START;
 
-  attachInterrupt(ENCODER_CLK, encoderIsrThunk, CHANGE);
-  attachInterrupt(ENCODER_DT, encoderIsrThunk, CHANGE);
+  esp_timer_create_args_t timerArgs = {};
+  timerArgs.callback = encoderTimerThunk;
+  timerArgs.arg = nullptr;
+  timerArgs.dispatch_method = ESP_TIMER_TASK;
+  timerArgs.name = "enc_poll";
+  if (esp_timer_create(&timerArgs, &_encoderTimer) == ESP_OK) {
+    esp_timer_start_periodic(_encoderTimer, 500);
+  }
 }
 
 void ClockApp::initTft()
@@ -233,21 +248,36 @@ void ClockApp::runTimeTask()
   }
 }
 
-void IRAM_ATTR ClockApp::onEncoderEdge()
+void ClockApp::pollEncoder()
 {
-  uint8_t ab = readEncoderAb();
+  uint8_t rawAb = readEncoderAb() ^ _encoderMask;
+  if (rawAb == _lastRawAb) {
+    if (_rawStableCount < 2) {
+      ++_rawStableCount;
+    }
+  } else {
+    _lastRawAb = rawAb;
+    _rawStableCount = 0;
+  }
 
-  portENTER_CRITICAL_ISR(&_encoderMux);
+  // Require 3 consecutive matching 500 us reads (1.0 ms stability) before advancing state
+  if (_rawStableCount < 2 || rawAb == _debouncedAb) {
+    return;
+  }
+
+  _debouncedAb = rawAb;
   uint8_t state = _encoderState;
-  int8_t step = ENCODER_STEP[state][ab];
-  _encoderState = ENCODER_NEXT_STATE[state][ab];
+  int8_t step = ENCODER_STEP[state][rawAb];
+  _encoderState = ENCODER_NEXT_STATE[state][rawAb];
+
   if (step != 0) {
+    portENTER_CRITICAL(&_encoderMux);
     _encoderDelta += step;
     if (_screenSleeping || _screenDimmed) {
       _wakeRequested = true;
     }
+    portEXIT_CRITICAL(&_encoderMux);
   }
-  portEXIT_CRITICAL_ISR(&_encoderMux);
 }
 
 void ClockApp::handleEncoder()
@@ -266,8 +296,7 @@ void ClockApp::handleEncoder()
   if (page_index == 0) {
     int nextIndex = ((_gifIndex + delta) % CLOCKFACE_COUNT + CLOCKFACE_COUNT) % CLOCKFACE_COUNT;
     _gifIndex = nextIndex;
-    Serial.print("gif_num=");
-    Serial.println(nextIndex);
+    Serial.printf("enc delta=%d -> gif_num=%d\n", delta, nextIndex);
   } else if (page_index == 1) {
     int nextBrightness = constrain(_brightness + delta, 0, 100);
     _brightness = nextBrightness;

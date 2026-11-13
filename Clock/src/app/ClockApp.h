@@ -2,6 +2,7 @@
 #define ClockApp_h
 
 #include <Arduino.h>
+#include <esp_timer.h>
 #include <Arduino_GFX_Library.h>
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include <lvgl.h>
@@ -12,11 +13,11 @@ class ClockApp {
   public:
     void begin();
 
-    // FreeRTOS task loops & ISR hooks
+    // FreeRTOS task loops & timer hooks
     void runTftTask();
     void runControlTask();
     void runTimeTask();
-    void IRAM_ATTR onEncoderEdge();
+    void pollEncoder();
     void flushDisplay(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p);
     void readTouchpad(lv_indev_drv_t *indev_driver, lv_indev_data_t *data);
     void setTftRotation(uint8_t rotation);
@@ -41,8 +42,13 @@ class ClockApp {
     lv_color_t _buf[TFT_WIDTH * TFT_HEIGHT / 10];
 
     portMUX_TYPE _encoderMux = portMUX_INITIALIZER_UNLOCKED;
+    esp_timer_handle_t _encoderTimer = nullptr;
     volatile int _encoderDelta = 0;
-    volatile uint8_t _encoderState = 3;
+    uint8_t _encoderState = 0;
+    uint8_t _encoderMask = 0;
+    uint8_t _lastRawAb = 3;
+    uint8_t _debouncedAb = 3;
+    uint8_t _rawStableCount = 0;
 
     volatile int _brightness = 30;
     volatile int _gifIndex = 0;
