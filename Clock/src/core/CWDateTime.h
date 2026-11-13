@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <RTClib.h>
+#include <time.h>
 
 class CWDateTime
 {
@@ -12,10 +13,13 @@ class CWDateTime
     unsigned long _lastSyncMillis = 0;
 
     DateTime now();
+    bool updateRtcFromTm(const struct tm &timeinfo, const char *logMsg);
 
   public:
     void begin();
     bool syncTimeNtp();
+    bool applyTimeZone();
+    void formatDateTime(char *buf, size_t len);
 
     char *getHour(const char *format);
     char *getMinute(const char *format);

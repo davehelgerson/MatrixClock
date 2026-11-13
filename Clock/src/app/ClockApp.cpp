@@ -16,7 +16,7 @@ int page_index = 0;
 ClockApp clockApp;
 
 namespace {
-  const int SETTINGS_FACE_INDEX = 5;
+  const int SETTINGS_FACE_INDEX = 6;
 
   enum EncoderState : uint8_t {
     ENC_START     = 0,
@@ -189,7 +189,8 @@ void ClockApp::initClockfaces()
   _clockfaces[2] = new Clockface1(_dmaDisplay);     // Pokedex
   _clockfaces[3] = new Clockface4(_dmaDisplay);     // Maple
   _clockfaces[4] = new Clockface5(_dmaDisplay);                                // Dad
-  _clockfaces[5] = new WifiClockface(_dmaDisplay,
+  _clockfaces[5] = new StarsClockface(_dmaDisplay);                            // Stars
+  _clockfaces[6] = new WifiClockface(_dmaDisplay,
                                      onRotationSettingChanged,
                                      onPowerTimeoutsChanged);                // Settings
 

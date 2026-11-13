@@ -15,6 +15,8 @@ class WifiConfig
     static constexpr uint16_t DEFAULT_OFF_MINUTES  = 15;
     static constexpr uint16_t MIN_TIMEOUT_MINUTES  = 1;
     static constexpr uint16_t MAX_TIMEOUT_MINUTES  = 720;
+    static constexpr uint8_t  DEFAULT_TZ_INDEX     = 0;
+    static constexpr bool     DEFAULT_DST_ENABLED  = true;
 
     static uint16_t normalizeTimeoutMinutes(uint16_t minutes);
 
@@ -28,6 +30,13 @@ class WifiConfig
     static uint16_t loadDimMinutes();
     static uint16_t loadOffMinutes();
     static bool savePowerTimeouts(uint16_t dimMinutes, uint16_t offMinutes);
+
+    static uint8_t getTimeZoneCount();
+    static const char *getTimeZoneLabel(uint8_t index);
+    static uint8_t loadTimeZoneIndex();
+    static bool loadDstEnabled();
+    static bool saveTimeZone(uint8_t index, bool dstEnabled);
+    static const char *getPosixTimeZone();
 };
 
 #endif

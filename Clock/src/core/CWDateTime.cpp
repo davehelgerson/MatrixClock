@@ -7,30 +7,14 @@
 #include <time.h>
 
 const char* ntpServer = "pool.ntp.org";
-// POSIX TZ string so DST is applied only between the US switch dates
-// (configTime's fixed daylight offset would keep the clock on EDT all year).
-// Adjust for your timezone, e.g. "CST6CDT,M3.2.0,M11.1.0".
-const char* timeZone = "EST5EDT,M3.2.0,M11.1.0";
 
 static const unsigned long WIFI_CONNECT_TIMEOUT_MS = 15000UL;
 static const unsigned long RTC_RESYNC_INTERVAL_MS  = 30000UL;
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
-bool CWDateTime::syncTimeNtp()
+bool CWDateTime::updateRtcFromTm(const struct tm &timeinfo, const char *logMsg)
 {
-  if (WiFi.status() != WL_CONNECTED) {
-    return false;
-  }
-
-  configTzTime(timeZone, ntpServer);
-
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 5000)) {
-    Serial.println("NTP failed, using existing RTC time");
-    return false;
-  }
-
   DateTime synced(
     timeinfo.tm_year + 1900,
     timeinfo.tm_mon + 1,
@@ -51,8 +35,46 @@ bool CWDateTime::syncTimeNtp()
 
   _cachedUnixTime = synced.unixtime();
   _lastSyncMillis = millis();
-  Serial.println("RTC set from NTP");
+  if (logMsg) {
+    Serial.println(logMsg);
+  }
   return true;
+}
+
+bool CWDateTime::syncTimeNtp()
+{
+  if (WiFi.status() != WL_CONNECTED) {
+    return false;
+  }
+
+  // POSIX TZ string applies DST automatically only between switch dates.
+  configTzTime(WifiConfig::getPosixTimeZone(), ntpServer);
+
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo, 5000)) {
+    Serial.println("NTP failed, using existing RTC time");
+    return false;
+  }
+
+  return updateRtcFromTm(timeinfo, "RTC set from NTP");
+}
+
+bool CWDateTime::applyTimeZone()
+{
+  time_t nowSec = time(nullptr);
+  if (nowSec < 1700000000L) {
+    return false;
+  }
+
+  setenv("TZ", WifiConfig::getPosixTimeZone(), 1);
+  tzset();
+
+  struct tm timeinfo;
+  if (!localtime_r(&nowSec, &timeinfo)) {
+    return false;
+  }
+
+  return updateRtcFromTm(timeinfo, "RTC updated for new time zone");
 }
 
 void CWDateTime::begin()
@@ -177,4 +199,32 @@ int CWDateTime::getDay()
 int CWDateTime::getMonth()
 {
   return now().month();
+}
+
+void CWDateTime::formatDateTime(char *buf, size_t len)
+{
+  if (!buf || len == 0) {
+    return;
+  }
+
+  static const char *SHORT_DAYS[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+  static const char *SHORT_MONTHS[] = {"", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+  DateTime dt = now();
+  uint8_t dow = dt.dayOfTheWeek();
+  uint8_t mon = dt.month();
+  int hour24 = dt.hour();
+  bool am = hour24 < 12;
+  int hour12 = hour24 % 12;
+  if (hour12 == 0) {
+    hour12 = 12;
+  }
+
+  const char *dayStr = (dow < 7) ? SHORT_DAYS[dow] : "---";
+  const char *monStr = (mon >= 1 && mon <= 12) ? SHORT_MONTHS[mon] : "---";
+
+  snprintf(buf, len, "%s, %s %d - %d:%02d:%02d %s",
+           dayStr, monStr, dt.day(),
+           hour12, dt.minute(), dt.second(), am ? "AM" : "PM");
 }

@@ -42,6 +42,8 @@ class WifiClockface : public IClockface {
     void handleScan();
     void handleSave();
     void handleDisplay();
+    void handleTimeZone();
+    void handleTime();
     void handleNotFound();
 
     void drawScreen();
@@ -52,6 +54,10 @@ class WifiClockface : public IClockface {
     static String escapeHtml(const String &src);
     static String escapeJson(const String &src);
     static String buildScanJson();
+    String formatClockTime() const;
+    bool syncNtpWithCredentials(const String &ssid, const String &password,
+                                unsigned long timeoutMs, bool &connectedOut,
+                                String *staIpOut = nullptr);
 
   public:
     WifiClockface(Adafruit_GFX *display,

@@ -20,6 +20,7 @@ const uint16_t DNS_PORT  = 53;
 const uint16_t HTTP_PORT = 80;
 const unsigned long ANIM_INTERVAL_MS = 300;
 const unsigned long STA_TEST_TIMEOUT_MS = 8000;
+const unsigned long TZ_SYNC_TIMEOUT_MS  = 6000;
 
 struct ScannedNetwork {
   String ssid;
@@ -102,6 +103,20 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     <button type="submit" class="btn">Apply &amp; Save Settings</button>
   </form>
 </div>
+
+<div class="card">
+  <h2>Time Zone &amp; DST</h2>
+  <p class="sub">Choose your time zone and whether Daylight Saving Time adjusts automatically.</p>
+  <div class="saved">Clock display time: <strong id="clockTime">__CLOCK_TIME__</strong></div>
+  <form method="POST" action="/timezone">
+    <label for="tzIndex">Time Zone</label>
+    <select id="tzIndex" name="tzIndex">
+      __TZ_OPTIONS__
+    </select>
+    <label class="chk"><input type="checkbox" name="dst" value="1"__DST_CHECKED__> Automatic Daylight Saving Time (DST)</label>
+    <button type="submit" class="btn">Save Time Zone</button>
+  </form>
+</div>
 </div>
 <script>
 function pickNetwork(val){
@@ -137,7 +152,21 @@ function loadScan(force){
       msg.textContent='Scan error. Tap Rescan to try again.';
     });
 }
+function pollClockTime(){
+  fetch('/time')
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data&&data.time){
+        document.getElementById('clockTime').textContent=data.time;
+      }
+      setTimeout(pollClockTime,1000);
+    })
+    .catch(function(){
+      setTimeout(pollClockTime,2000);
+    });
+}
 loadScan(false);
+setTimeout(pollClockTime,1000);
 </script>
 </body>
 </html>)rawliteral";
@@ -185,6 +214,8 @@ void WifiClockface::setup(CWDateTime *dateTime)
   _server->on("/scan", HTTP_GET, [this]() { handleScan(); });
   _server->on("/save", HTTP_POST, [this]() { handleSave(); });
   _server->on("/display", HTTP_POST, [this]() { handleDisplay(); });
+  _server->on("/timezone", HTTP_POST, [this]() { handleTimeZone(); });
+  _server->on("/time", HTTP_GET, [this]() { handleTime(); });
   _server->onNotFound([this]() { handleNotFound(); });
   _server->begin();
 
@@ -262,6 +293,24 @@ void WifiClockface::handleRoot()
   html.replace("__DIM_MIN__", String(WifiConfig::loadDimMinutes()));
   html.replace("__OFF_MIN__", String(WifiConfig::loadOffMinutes()));
 
+  uint8_t tzIdx = WifiConfig::loadTimeZoneIndex();
+  uint8_t tzCount = WifiConfig::getTimeZoneCount();
+  String tzOptions;
+  for (uint8_t i = 0; i < tzCount; ++i) {
+    tzOptions += "<option value='";
+    tzOptions += String(i);
+    tzOptions += "'";
+    if (i == tzIdx) {
+      tzOptions += " selected";
+    }
+    tzOptions += ">";
+    tzOptions += escapeHtml(WifiConfig::getTimeZoneLabel(i));
+    tzOptions += "</option>";
+  }
+  html.replace("__TZ_OPTIONS__", tzOptions);
+  html.replace("__DST_CHECKED__", WifiConfig::loadDstEnabled() ? " checked" : "");
+  html.replace("__CLOCK_TIME__", escapeHtml(formatClockTime()));
+
   _server->send(200, "text/html", html);
 }
 
@@ -307,29 +356,16 @@ void WifiClockface::handleSave()
   _statusColor = COLOR_AMBER;
   drawScreen();
 
-  WiFi.disconnect(false);
-  WiFi.begin(ssid.c_str(), password.c_str());
-
-  unsigned long start = millis();
-  while (WiFi.status() != WL_CONNECTED && (millis() - start) < STA_TEST_TIMEOUT_MS) {
-    delay(100);
-  }
-
-  bool connected = (WiFi.status() == WL_CONNECTED);
-  bool ntpSynced = false;
-  String staIp = "";
+  bool connected = false;
+  String staIp;
+  bool ntpSynced = syncNtpWithCredentials(ssid, password, STA_TEST_TIMEOUT_MS, connected, &staIp);
   if (connected) {
-    staIp = WiFi.localIP().toString();
-    if (_dateTime) {
-      ntpSynced = _dateTime->syncTimeNtp();
-    }
     _statusLine = "SAVED OK!";
     _statusColor = COLOR_GREEN;
   } else {
     _statusLine = "SAVED";
     _statusColor = COLOR_AMBER;
   }
-  WiFi.disconnect(false);
   _dirtyDisplay = true;
 
   String page = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
@@ -345,6 +381,7 @@ void WifiClockface::handleSave()
     page += "<p>Network: <strong>" + escapeHtml(ssid) + "</strong></p>";
     page += "<p>IP Address: <code>" + escapeHtml(staIp) + "</code></p>";
     page += "<p>Clock NTP sync: <strong>" + String(ntpSynced ? "Updated" : "Pending") + "</strong></p>";
+    page += "<p>Clock display time: <strong>" + escapeHtml(formatClockTime()) + "</strong></p>";
   } else {
     page += "<h2 style='color:#fbbf24;margin-top:0'>Credentials Saved</h2>";
     page += "<p>Saved network: <strong>" + escapeHtml(ssid) + "</strong></p>";
@@ -439,6 +476,117 @@ void WifiClockface::handleDisplay()
                 "<a href='/'>Back to Settings</a></div></body></html>";
 
   _server->send(200, "text/html", page);
+}
+
+bool WifiClockface::syncNtpWithCredentials(const String &ssid, const String &password,
+                                           unsigned long timeoutMs, bool &connectedOut,
+                                           String *staIpOut)
+{
+  WiFi.disconnect(false);
+  WiFi.begin(ssid.c_str(), password.c_str());
+
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && (millis() - start) < timeoutMs) {
+    delay(100);
+  }
+
+  connectedOut = (WiFi.status() == WL_CONNECTED);
+  bool ntpSynced = false;
+  if (connectedOut) {
+    if (staIpOut) {
+      *staIpOut = WiFi.localIP().toString();
+    }
+    if (_dateTime) {
+      ntpSynced = _dateTime->syncTimeNtp();
+    }
+  }
+  WiFi.disconnect(false);
+  return ntpSynced;
+}
+
+void WifiClockface::handleTimeZone()
+{
+  int tzIndex = -1;
+  uint8_t maxIndex = (WifiConfig::getTimeZoneCount() > 0)
+                       ? static_cast<uint8_t>(WifiConfig::getTimeZoneCount() - 1)
+                       : 0;
+  bool tzOk = parseNonNegativeIntArg(*_server, "tzIndex", maxIndex, tzIndex);
+  bool dstEnabled = _server->hasArg("dst");
+
+  if (!tzOk || !WifiConfig::saveTimeZone(static_cast<uint8_t>(tzIndex), dstEnabled)) {
+    _server->send(400, "text/html",
+      "<html><body style='font-family:sans-serif;background:#0f172a;color:#f87171;padding:20px'>"
+      "<h2>Invalid Time Zone</h2><p>Please select a valid time zone.</p>"
+      "<a href='/' style='color:#38bdf8'>Back</a></body></html>");
+    return;
+  }
+
+  String ssid;
+  String pass;
+  bool hasWifi = WifiConfig::load(ssid, pass);
+  bool connected = false;
+  bool ntpSynced = false;
+  bool updatedFromSystemClock = false;
+
+  if (hasWifi) {
+    _statusLine = "SYNCING...";
+    _statusColor = COLOR_AMBER;
+    drawScreen();
+    ntpSynced = syncNtpWithCredentials(ssid, pass, TZ_SYNC_TIMEOUT_MS, connected);
+  }
+  if (!ntpSynced && _dateTime) {
+    updatedFromSystemClock = _dateTime->applyTimeZone();
+  }
+
+  _statusLine = (ntpSynced || updatedFromSystemClock) ? "SYNCED!" : "SAVED";
+  _statusColor = COLOR_GREEN;
+  _dirtyDisplay = true;
+
+  String tzLabel = escapeHtml(WifiConfig::getTimeZoneLabel(static_cast<uint8_t>(tzIndex)));
+  String dstLabel = dstEnabled ? "Automatic (POSIX rule)" : "Off (Standard time year-round)";
+  String clockTimeStr = escapeHtml(formatClockTime());
+  String syncMsg;
+  if (ntpSynced) {
+    syncMsg = "Clock updated via NTP now.";
+  } else if (updatedFromSystemClock) {
+    syncMsg = "Clock adjusted to the new time zone immediately.";
+  } else if (hasWifi) {
+    syncMsg = "Saved, but WiFi/NTP could not be reached right now; will apply on next boot/NTP sync.";
+  } else {
+    syncMsg = "Saved. Connect WiFi above or restart once WiFi is configured to sync the clock.";
+  }
+
+  String page = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+                "<title>Time Zone Saved</title>"
+                "<style>body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;display:flex;justify-content:center}"
+                ".card{max-width:420px;width:100%;background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px}"
+                "a{display:inline-block;margin-top:16px;padding:10px 14px;background:#0284c7;color:#fff;text-decoration:none;border-radius:8px}</style>"
+                "</head><body><div class='card'>"
+                "<h2 style='color:#4ade80;margin-top:0'>Time Zone Saved</h2>"
+                "<p>Clock display time: <strong>" + clockTimeStr + "</strong></p>"
+                "<p>Time zone: <strong>" + tzLabel + "</strong></p>"
+                "<p>Daylight Saving Time: <strong>" + dstLabel + "</strong></p>"
+                "<p>" + syncMsg + "</p>"
+                "<a href='/'>Back to Settings</a></div></body></html>";
+
+  _server->send(200, "text/html", page);
+}
+
+String WifiClockface::formatClockTime() const
+{
+  if (!_dateTime) {
+    return "Unavailable";
+  }
+  char buf[40];
+  _dateTime->formatDateTime(buf, sizeof(buf));
+  return String(buf);
+}
+
+void WifiClockface::handleTime()
+{
+  String json = "{\"time\":\"" + escapeJson(formatClockTime()) + "\"}";
+  _server->send(200, "application/json", json);
 }
 
 void WifiClockface::handleNotFound()

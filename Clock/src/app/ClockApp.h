@@ -29,7 +29,7 @@ class ClockApp {
     static const uint8_t  PANEL_RES_X = 64;
     static const uint8_t  PANEL_RES_Y = 64;
     static const uint8_t  PANEL_CHAIN = 1;
-    static const int     CLOCKFACE_COUNT = 6;
+    static const int     CLOCKFACE_COUNT = 7;
 
     Arduino_ESP32SPI *_bus = nullptr;
     Arduino_GFX *_gfx = nullptr;
