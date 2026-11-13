@@ -69,6 +69,33 @@ void drawCompactClockTime(Adafruit_GFX* display, uint8_t hour, uint8_t minute, i
   drawCompactClockDigit(display, minute % 10, x + (14 * scale), y, color, scale);
 }
 
+// Draws 7x5 pixel-art "AM" or "PM" at (lx, ly).
+void drawAmPm(Adafruit_GFX* d, bool am, int16_t lx, int16_t ly, uint16_t color)
+{
+  if (am) {
+    // A:  .X. / X.X / XXX / X.X / X.X
+    d->drawPixel(lx + 1, ly,     color);
+    d->drawPixel(lx,     ly + 1, color); d->drawPixel(lx + 2, ly + 1, color);
+    d->fillRect( lx,     ly + 2, 3, 1, color);
+    d->drawPixel(lx,     ly + 3, color); d->drawPixel(lx + 2, ly + 3, color);
+    d->drawPixel(lx,     ly + 4, color); d->drawPixel(lx + 2, ly + 4, color);
+  } else {
+    // P:  XX. / X.X / XX. / X.. / X..
+    d->fillRect( lx,     ly,     2, 1, color);
+    d->drawPixel(lx,     ly + 1, color); d->drawPixel(lx + 2, ly + 1, color);
+    d->fillRect( lx,     ly + 2, 2, 1, color);
+    d->drawPixel(lx,     ly + 3, color);
+    d->drawPixel(lx,     ly + 4, color);
+  }
+  // M:  X.X / XXX / X.X / X.X / X.X  (placed 4px right of A/P)
+  const int16_t mx = lx + 4;
+  d->drawPixel(mx,     ly,     color); d->drawPixel(mx + 2, ly,     color);
+  d->fillRect( mx,     ly + 1, 3, 1, color);
+  d->drawPixel(mx,     ly + 2, color); d->drawPixel(mx + 2, ly + 2, color);
+  d->drawPixel(mx,     ly + 3, color); d->drawPixel(mx + 2, ly + 3, color);
+  d->drawPixel(mx,     ly + 4, color); d->drawPixel(mx + 2, ly + 4, color);
+}
+
 // Graphical
 Tile ground(GROUND, 8, 8); 
 
@@ -117,12 +144,13 @@ const uint16_t* const pokemons[] PROGMEM = {pokemon1, pokemon2, pokemon3, pokemo
 unsigned long lastMillisMin2 = 0;
 unsigned long lastMillisTime2 = 0;
 unsigned long lastMillisSec2 = 0;
-Pacman *pacman;
+Pacman *pacman = nullptr;
 
 //**********************************************************************************************
 Clockface::Clockface(Adafruit_GFX* display) 
 {
   _display = display;
+  _dateTime = nullptr;
 
   Locator::provide(display);
   Locator::provide(&eventBus);
@@ -131,6 +159,7 @@ Clockface::Clockface(Adafruit_GFX* display)
 Clockface1::Clockface1(Adafruit_GFX* display) 
 {
   _display = display;
+  _dateTime = nullptr;
 
   Locator::provide(display);
   Locator::provide(&eventBus);
@@ -139,6 +168,7 @@ Clockface1::Clockface1(Adafruit_GFX* display)
 Clockface2::Clockface2(Adafruit_GFX* display) 
 {
   _display = display;
+  _dateTime = nullptr;
 
   Locator::provide(display);
   Locator::provide(&eventBus);
@@ -147,6 +177,7 @@ Clockface2::Clockface2(Adafruit_GFX* display)
 Clockface3::Clockface3(Adafruit_GFX* display) 
 {
   _display = display;
+  _dateTime = nullptr;
 
   Locator::provide(display);
   Locator::provide(&eventBus);
@@ -182,6 +213,7 @@ void Clockface::setup(CWDateTime *dateTime)
 //**********************************************************************************************
 void Clockface::update() 
 {
+  if (!_dateTime) return;
   int updatedSecond;
   
   hourBlock.update();
@@ -243,6 +275,7 @@ void Clockface3::setup(CWDateTime *dateTime) {
 }
 
 void Clockface3::update() {
+  if (!_dateTime) return;
 
   hourBlock3.update();
   minuteBlock3.update();
@@ -301,6 +334,7 @@ void Clockface1::setup(CWDateTime *dateTime)
 
 void Clockface1::update() 
 {
+  if (!_dateTime) return;
   if (millis() - lastMillis1 >= 1000) {
 
     uint8_t seconds = _dateTime->getSecond();
@@ -374,6 +408,7 @@ void Clockface2::setup(CWDateTime *dateTime) {
 
 void Clockface2::update()
 {
+  if (!_dateTime || !pacman) return;
   // Seconds blink  
   if ((millis() - lastMillisSec2) >= 1000) {
     
@@ -452,6 +487,7 @@ void Clockface2::drawMap()
       } else if (_MAP[j][i] == MapBlock::SUPER_FOOD) {
         Locator::getDisplay()->fillRect((i*5)+3,(j*5)+3,3,3,spcfood_color);
       } else if (_MAP[j][i] == MapBlock::PACMAN) {
+        delete pacman;
         pacman = new Pacman((i*5)+2,(j*5)+2);
 
         // Locator::getDisplay()->drawRGBBitmap((i*5)+2,(j*5)+2, _PACMAN_2, 5, 5);
@@ -590,7 +626,7 @@ int Clockface2::countBlocks(Clockface2::MapBlock elem) {
 //**********************************************************************************************
 //**********************************************************************************************
 Clockface4::Clockface4(Adafruit_GFX* display)
-    : _maple(4, MAPLE_CAT_GROUND_Y), _lastMinMillis(0), _nextWalkDir(RIGHT)
+    : _dateTime(nullptr), _maple(4, MAPLE_CAT_GROUND_Y), _lastMinMillis(0), _nextWalkDir(RIGHT)
 {
   _display = display;
   Locator::provide(display);
@@ -649,33 +685,11 @@ void Clockface4::updateClock() {
   }
 
   // AM/PM as pixel-art letters at (45,22), 3×5 each with 1px gap = 7px total wide.
-  // Drawn with fillRect/drawPixel so it's guaranteed to render (same as digits above).
-  const int16_t lx = 45, ly = 22;
-  if (am) {
-    // A:  .X. / X.X / XXX / X.X / X.X
-    d->drawPixel(lx+1, ly,   MAPLE_TIME);
-    d->drawPixel(lx,   ly+1, MAPLE_TIME); d->drawPixel(lx+2, ly+1, MAPLE_TIME);
-    d->fillRect( lx,   ly+2, 3, 1,       MAPLE_TIME);
-    d->drawPixel(lx,   ly+3, MAPLE_TIME); d->drawPixel(lx+2, ly+3, MAPLE_TIME);
-    d->drawPixel(lx,   ly+4, MAPLE_TIME); d->drawPixel(lx+2, ly+4, MAPLE_TIME);
-  } else {
-    // P:  XX. / X.X / XX. / X.. / X..
-    d->fillRect( lx,   ly,   2, 1,       MAPLE_TIME);
-    d->drawPixel(lx,   ly+1, MAPLE_TIME); d->drawPixel(lx+2, ly+1, MAPLE_TIME);
-    d->fillRect( lx,   ly+2, 2, 1,       MAPLE_TIME);
-    d->drawPixel(lx,   ly+3, MAPLE_TIME);
-    d->drawPixel(lx,   ly+4, MAPLE_TIME);
-  }
-  // M:  X.X / XXX / X.X / X.X / X.X  (placed 4px right of A/P)
-  const int16_t mx = lx + 4;
-  d->drawPixel(mx,   ly,   MAPLE_TIME); d->drawPixel(mx+2, ly,   MAPLE_TIME);
-  d->fillRect( mx,   ly+1, 3, 1,       MAPLE_TIME);
-  d->drawPixel(mx,   ly+2, MAPLE_TIME); d->drawPixel(mx+2, ly+2, MAPLE_TIME);
-  d->drawPixel(mx,   ly+3, MAPLE_TIME); d->drawPixel(mx+2, ly+3, MAPLE_TIME);
-  d->drawPixel(mx,   ly+4, MAPLE_TIME); d->drawPixel(mx+2, ly+4, MAPLE_TIME);
+  drawAmPm(d, am, 45, 22, MAPLE_TIME);
 }
 
 void Clockface4::update() {
+  if (!_dateTime) return;
   _maple.update();
 
   if (_dateTime->getSecond() == 0 && millis() - _lastMinMillis > 1000) {
@@ -689,6 +703,188 @@ void Clockface4::update() {
       // Every minute: walk to the other side
       _maple.walk(_nextWalkDir);
       _nextWalkDir = (_nextWalkDir == RIGHT) ? LEFT : RIGHT;
+    }
+  }
+}
+//**********************************************************************************************
+//**********************************************************************************************
+//Clockface5 - Dad *****************************************************************************
+//**********************************************************************************************
+//**********************************************************************************************
+static const uint16_t DAD_BG            = 0x0000;
+static const uint16_t DAD_CLOCK_COLOR   = 0xFFFF;
+static const uint16_t DAD_LABEL_COLOR   = 0xFED6; // Warm cream-gold
+static const uint16_t DAD_COLORS[]      = {
+  0x07FF, // Cyan
+  0xFFE0, // Gold
+  0xFD20, // Orange
+  0xF81F, // Pink
+  0x07E0, // Green
+  0x5DFF  // Sky blue
+};
+static const uint8_t DAD_COLOR_COUNT    = sizeof(DAD_COLORS) / sizeof(DAD_COLORS[0]);
+static const char* const DAD_MESSAGES[] = {
+  "I love you!",
+  "You are the best son!",
+  "You are amazing!",
+  "I love your creativity!",
+  "I'm proud of you!",
+  "You're my favorite human!",
+  "You are the son I always wanted!",
+  "You make me happy every day!",
+  "You're braver than you know!",
+  "I'm so happy that you are my son!"
+};
+static const uint8_t  DAD_MSG_COUNT     = sizeof(DAD_MESSAGES) / sizeof(DAD_MESSAGES[0]);
+static const uint8_t  DAD_TEXT_SCALE    = 1;
+static const int16_t  DAD_CHAR_W        = 6 * DAD_TEXT_SCALE;
+static const int16_t  DAD_CHAR_H        = 8 * DAD_TEXT_SCALE;
+static const int16_t  DAD_SCROLL_Y      = 28;
+static const uint16_t DAD_SCROLL_MS     = 35;
+static const uint16_t DAD_CLOCK_POLL_MS = 500;
+
+Clockface5::Clockface5(Adafruit_GFX* display)
+    : _display(display), _dateTime(nullptr), _msgIndex(-1),
+      _scrollX(64), _msgWidth(0), _msgColor(DAD_COLORS[0]),
+      _lastScrollMillis(0), _lastClockMillis(0),
+      _lastHour(-1), _lastMinute(-1), _lastIsAM(true)
+{
+  Locator::provide(display);
+  Locator::provide(&eventBus);
+}
+
+void Clockface5::setup(CWDateTime *dateTime) {
+  _dateTime = dateTime;
+  randomSeed(esp_random());
+
+  auto* d = Locator::getDisplay();
+  d->fillRect(0, 0, 64, 64, DAD_BG);
+
+  _lastHour = -1;
+  _lastMinute = -1;
+  drawLabels();
+  updateClock();
+
+  _msgIndex = -1;
+  pickNextMessage();
+
+  _lastScrollMillis = millis();
+  _lastClockMillis = millis();
+}
+
+void Clockface5::drawLabels() {
+  auto* d = Locator::getDisplay();
+  d->setFont(nullptr);
+  d->setTextWrap(false);
+  d->setTextSize(1);
+  d->setTextColor(DAD_LABEL_COLOR, DAD_BG);
+
+  d->setCursor(2, 2);
+  d->print("To Logan:");
+
+  d->setCursor(34, 55);
+  d->print("- Dad");
+}
+
+void Clockface5::pickNextMessage() {
+  if (_msgIndex < 0) {
+    _msgIndex = random(DAD_MSG_COUNT);
+  } else {
+    int8_t nextIdx = random(DAD_MSG_COUNT - 1);
+    if (nextIdx >= _msgIndex) {
+      nextIdx++;
+    }
+    _msgIndex = nextIdx;
+  }
+
+  uint8_t nextColorIdx = random(DAD_COLOR_COUNT);
+  if (DAD_COLOR_COUNT > 1 && DAD_COLORS[nextColorIdx] == _msgColor) {
+    nextColorIdx = (nextColorIdx + 1) % DAD_COLOR_COUNT;
+  }
+  _msgColor = DAD_COLORS[nextColorIdx];
+  _msgWidth = (int16_t)strlen(DAD_MESSAGES[_msgIndex]) * DAD_CHAR_W;
+  _scrollX = 64;
+}
+
+void Clockface5::updateClock() {
+  if (!_dateTime) return;
+
+  int h24 = _dateTime->getHour();
+  int minute = _dateTime->getMinute();
+  bool am = _dateTime->isAM();
+  int h12 = h24 % 12;
+  if (h12 == 0) h12 = 12;
+
+  if (h12 == _lastHour && minute == _lastMinute && am == _lastIsAM) {
+    return;
+  }
+  _lastHour = h12;
+  _lastMinute = minute;
+  _lastIsAM = am;
+
+  auto* d = Locator::getDisplay();
+  d->fillRect(0, 55, 32, 9, DAD_BG);
+
+  int16_t x = 2;
+  const int16_t y = 57;
+
+  if (h12 >= 10) {
+    drawCompactClockDigit(d, h12 / 10, x, y, DAD_CLOCK_COLOR, 1);
+    x += 4;
+  }
+  drawCompactClockDigit(d, h12 % 10, x, y, DAD_CLOCK_COLOR, 1);
+  x += 4;
+
+  d->drawPixel(x, y + 1, DAD_CLOCK_COLOR);
+  d->drawPixel(x, y + 3, DAD_CLOCK_COLOR);
+  x += 2;
+
+  drawCompactClockDigit(d, minute / 10, x, y, DAD_CLOCK_COLOR, 1);
+  x += 4;
+  drawCompactClockDigit(d, minute % 10, x, y, DAD_CLOCK_COLOR, 1);
+  x += 5;
+
+  drawAmPm(d, am, x, y, DAD_CLOCK_COLOR);
+}
+
+void Clockface5::drawScrollingMessage() {
+  auto* d = Locator::getDisplay();
+  d->setFont(nullptr);
+  d->setTextWrap(false);
+  d->setTextSize(1);
+
+  const char* msg = DAD_MESSAGES[_msgIndex];
+  size_t len = strlen(msg);
+
+  for (size_t i = 0; i < len; i++) {
+    int16_t charX = _scrollX + (int16_t)i * DAD_CHAR_W;
+    if (charX + DAD_CHAR_W <= 0) continue;
+    if (charX >= 64) break;
+    d->drawChar(charX, DAD_SCROLL_Y, (unsigned char)msg[i], _msgColor, DAD_BG, DAD_TEXT_SCALE, DAD_TEXT_SCALE);
+  }
+
+  int16_t trailX = _scrollX + _msgWidth;
+  if (trailX >= 0 && trailX < 64) {
+    d->drawFastVLine(trailX, DAD_SCROLL_Y, DAD_CHAR_H, DAD_BG);
+  }
+}
+
+void Clockface5::update() {
+  if (!_dateTime) return;
+
+  unsigned long now = millis();
+  if ((unsigned long)(now - _lastClockMillis) >= DAD_CLOCK_POLL_MS) {
+    _lastClockMillis = now;
+    updateClock();
+  }
+
+  if ((unsigned long)(now - _lastScrollMillis) >= DAD_SCROLL_MS) {
+    _lastScrollMillis = now;
+    _scrollX--;
+    if (_scrollX < -_msgWidth) {
+      pickNextMessage();
+    } else {
+      drawScrollingMessage();
     }
   }
 }

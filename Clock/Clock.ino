@@ -38,18 +38,19 @@ static lv_color_t buf[screenWidth * screenHeight / 10];
 Arduino_ESP32SPI *bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCLK, TFT_MOSI, TFT_MISO, HSPI, true); // Constructor
 Arduino_GFX *gfx = new Arduino_GC9A01(bus, TFT_RES, 3 /* rotation */, true /* IPS */);
 
-int counter = 0;
+volatile int counter = 0;
+portMUX_TYPE encoderMux = portMUX_INITIALIZER_UNLOCKED;
 int State;
 int old_State;
 int move_flag = 0;
 
-int brightness = 30;
+volatile int brightness = 30;
 
 // LVGL Global Value
 int page_index = 0;
-int gif_num = 0;
-int fresh_flag = 0;
-bool screen_dimmed = false;
+volatile int gif_num = 0;
+volatile int fresh_flag = 0;
+volatile bool screen_dimmed = false;
 
 MatrixPanel_I2S_DMA *dma_display = nullptr;
 
@@ -59,6 +60,7 @@ Clockface1 *clockface1;
 Clockface2 *clockface2;
 Clockface3 *clockface3;
 Clockface4 *clockface4;
+Clockface5 *clockface5;
 RTC_PCF8563 rtc;
 
 #define panelResX 64     // Number of pixels wide of each INDIVIDUAL panel module. 
@@ -69,9 +71,9 @@ uint16_t myBLACK = dma_display->color565(0, 0, 0);
 uint16_t myWHITE = dma_display->color565(255, 255, 255);
 uint16_t myBLUE = dma_display->color565(0, 0, 255);
 
-unsigned long screen_lastMillis = 0;
-int screen_sleep = 0;
-int screen_weak_up = 0;
+volatile unsigned long screen_lastMillis = 0;
+volatile int screen_sleep = 0;
+volatile int screen_weak_up = 0;
 
 //**********************************************************************************************
 void displaySetup() 
@@ -131,6 +133,7 @@ void setup()
   clockface2 = new Clockface2(dma_display);
   clockface3 = new Clockface3(dma_display);
   clockface4 = new Clockface4(dma_display);
+  clockface5 = new Clockface5(dma_display);
 
   cwDateTime.begin();
   
@@ -152,8 +155,9 @@ void Task_TFT(void *pvParameters)
 {
     while (1)
     {
+        obj_update();
         lv_timer_handler();
-        vTaskDelay(50);
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 //**********************************************************************************************
@@ -162,18 +166,25 @@ void Task_Main(void *pvParameters)
     while (1)
     {
         encoder_func();
-        obj_update();
-        vTaskDelay(500);
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 //**********************************************************************************************
 void Task_Time(void *pvParameters)
 {
+  int active_gif = 0;
   while(1)
   {
-      update_time(gif_num);
-      if(fresh_flag==1){vTaskDelay(500);time_bg(gif_num);}
-      //vTaskDelay(10);
+      int target_gif = gif_num;
+      if (target_gif != active_gif)
+      {
+          vTaskDelay(pdMS_TO_TICKS(150));
+          target_gif = gif_num;
+          active_gif = target_gif;
+          time_bg(active_gif);
+      }
+      update_time(active_gif);
+      vTaskDelay(1);
   }
 }
 //**********************************************************************************************
@@ -236,6 +247,10 @@ void time_bg(int bg)
     clockface4->setup(&cwDateTime);
     clockface4->update();
     fresh_flag=0;break;
+    case 4:
+    clockface5->setup(&cwDateTime);
+    clockface5->update();
+    fresh_flag=0;break;
   }
 }
 
@@ -257,6 +272,10 @@ void update_time(int time)
   {
     clockface4->update();
   }
+  else if(time==4)
+  {
+    clockface5->update();
+  }
 }
 
 void pin_init()
@@ -272,11 +291,12 @@ void pin_init()
     attachInterrupt(ENCODER_CLK, encoder_irq, CHANGE);
 }
 
-void encoder_irq()
+void IRAM_ATTR encoder_irq()
 {
     State = digitalRead(ENCODER_CLK);
     if (State != old_State)
     {
+        portENTER_CRITICAL_ISR(&encoderMux);
         if (digitalRead(ENCODER_DT) == State)
         {
             counter++;
@@ -285,6 +305,7 @@ void encoder_irq()
         {
             counter--;
         }
+        portEXIT_CRITICAL_ISR(&encoderMux);
 
         if(screen_sleep==1 || screen_dimmed)
         {
@@ -334,55 +355,64 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 
 void encoder_func()
 {
+    portENTER_CRITICAL(&encoderMux);
+    int delta = counter;
+    counter = 0;
+    portEXIT_CRITICAL(&encoderMux);
+
+    if (delta == 0)
+    {
+        return;
+    }
+
+    screen_lastMillis = millis();
+
     if (page_index == 0)
     {
-        if (counter != 0)
-        {
-            screen_lastMillis=millis();
-            gif_num += counter;
-            counter = 0;
+        int next_gif = ((gif_num + delta) % 5 + 5) % 5;
+        gif_num = next_gif;
 
-            if (gif_num < 0)
-                gif_num = 3;
-            if (gif_num > 3)
-                gif_num = 0;
-
-            Serial.print("gif_num=");
-            Serial.println(gif_num);
-            fresh_flag = 1;
-        }
+        Serial.print("gif_num=");
+        Serial.println(next_gif);
+        fresh_flag = 1;
     }
     else if (page_index == 1)
     {
-        if (counter != 0)
-        {
-            screen_lastMillis=millis();
-            brightness += counter;
-            counter = 0;
+        int next_brightness = brightness + delta;
+        if (next_brightness < 0)
+            next_brightness = 0;
+        if (next_brightness > 100)
+            next_brightness = 100;
+        brightness = next_brightness;
 
-            if (brightness < 0)
-                brightness = 0;
-            if (brightness > 100)
-                brightness = 100;
-
-            dma_display->setBrightness(map(brightness, 0, 100, 0, 255)); // map()函数将亮度值从用户熟悉的百分比（0% 到 100%）映射到硬件亮度范围（0 到 255）
-        }
+        dma_display->setBrightness(map(next_brightness, 0, 100, 0, 255)); // map()函数将亮度值从用户熟悉的百分比（0% 到 100%）映射到硬件亮度范围（0 到 255）
     }
 }
 
 void obj_update()
 {
-    char temp[80] = "";
-    if (page_index == 0)
+    static int last_ui_page = -1;
+    static int last_ui_gif = -1;
+    static int last_ui_brightness = -1;
+
+    int cur_page = page_index;
+    int cur_gif = gif_num;
+    int cur_brightness = brightness;
+
+    if (cur_page == 0 && (cur_page != last_ui_page || cur_gif != last_ui_gif))
     {
-        lv_roller_set_selected(ui_Roller1, gif_num, LV_ANIM_ON);
+        lv_roller_set_selected(ui_Roller1, cur_gif, LV_ANIM_ON);
+        last_ui_gif = cur_gif;
+        last_ui_page = cur_page;
     }
-
-    if (page_index == 1) // 改变亮度
+    else if (cur_page == 1 && (cur_page != last_ui_page || cur_brightness != last_ui_brightness)) // 改变亮度
     {
-        lv_arc_set_value(ui_Arc1, brightness);
+        char temp[16] = "";
+        lv_arc_set_value(ui_Arc1, cur_brightness);
 
-        sprintf(temp, "%d%%", brightness);
+        snprintf(temp, sizeof(temp), "%d%%", cur_brightness);
         lv_label_set_text(ui_Label1, temp);
+        last_ui_brightness = cur_brightness;
+        last_ui_page = cur_page;
     }
 }
