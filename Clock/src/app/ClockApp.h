@@ -61,6 +61,12 @@ class ClockApp {
     volatile uint16_t _dimMinutes = 5;
     volatile uint16_t _offMinutes = 15;
 
+    // Cross-task requests: hardware is only touched by the task that owns it.
+    // _gfx (SPI TFT) belongs to Task_TFT; _dmaDisplay belongs to Task_Time.
+    volatile bool _tftOnRequested = true;
+    volatile int _matrixBrightnessRequested = -1; // 0-255, -1 = no change pending
+    bool _touchSuppressed = false;
+
     void initPins();
     void initTft();
     void initMatrix();
@@ -68,6 +74,7 @@ class ClockApp {
     void handleEncoder();
     void handlePowerState();
     void updateUiWidgets();
+    void requestMatrixBrightness(int percent);
 };
 
 extern ClockApp clockApp;

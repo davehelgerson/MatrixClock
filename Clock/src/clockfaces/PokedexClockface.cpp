@@ -33,7 +33,8 @@ void Clockface1::setup(CWDateTime *dateTime)
   Locator::getDisplay()->setFont(&PKMN_RBYGSC4pt7b);
 
   refreshTime();
-  refreshDate(_dateTime->getWeekday(), DARK_BLUE);
+  _lastWeekday = _dateTime->getWeekday();
+  refreshDate(_lastWeekday, DARK_BLUE);
   updatePokemon();
   _lastMillis = millis();
 }
@@ -47,10 +48,15 @@ void Clockface1::update()
 
     refreshTime();
     updatePokemon();
-    if (_dateTime->getMinute() == 0 && seconds == 0) {
-      uint8_t wd = _dateTime->getWeekday();
-      refreshDate((wd == 0 ? 6 : wd - 1), LIGHT_BLUE);
+    // Track the weekday directly: sampling every ~1s can skip second 0, which
+    // used to leave the old day highlighted after midnight.
+    int8_t wd = _dateTime->getWeekday();
+    if (wd != _lastWeekday) {
+      if (_lastWeekday >= 0) {
+        refreshDate(_lastWeekday, LIGHT_BLUE);
+      }
       refreshDate(wd, DARK_BLUE);
+      _lastWeekday = wd;
     }
 
     updateLoadingBar(seconds);

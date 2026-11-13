@@ -44,7 +44,8 @@ int i2c_read(uint16_t addr, uint8_t reg_addr, uint8_t *reg_data, uint32_t length
     Wire.write(reg_addr);
     if (Wire.endTransmission(true))
         return -1;
-    Wire.requestFrom(addr, length, true);
+    if (Wire.requestFrom(addr, length, true) != length)
+        return -1;
     for (uint32_t i = 0; i < length; i++)
     {
         *reg_data++ = Wire.read();

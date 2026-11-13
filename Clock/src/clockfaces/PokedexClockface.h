@@ -10,6 +10,7 @@ class Clockface1: public IClockface {
     Adafruit_GFX* _display;
     CWDateTime* _dateTime;
     unsigned long _lastMillis = 0;
+    int8_t _lastWeekday = -1;
 
   public:
     Clockface1(Adafruit_GFX* display);

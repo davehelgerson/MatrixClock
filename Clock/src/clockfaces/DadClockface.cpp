@@ -33,7 +33,7 @@ namespace {
     "Remember to always be kind!",
     "I'm always cheering for you!",
     "Thank you for being you!",
-    "You are couragous and strong!"
+    "You are courageous and strong!"
   };
   const uint8_t  DAD_MSG_COUNT     = sizeof(DAD_MESSAGES) / sizeof(DAD_MESSAGES[0]);
   const uint8_t  DAD_TEXT_SCALE    = 1;

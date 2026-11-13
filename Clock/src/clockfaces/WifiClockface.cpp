@@ -94,10 +94,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     </select>
 
     <label for="dimMinutes">Dim Clock After (1&ndash;720 min)</label>
-    <input id="dimMinutes" name="dimMinutes" type="number" min="0" max="720" required value="__DIM_MIN__">
+    <input id="dimMinutes" name="dimMinutes" type="number" min="1" max="720" required value="__DIM_MIN__">
 
     <label for="offMinutes">Turn Display Off After (1&ndash;720 min)</label>
-    <input id="offMinutes" name="offMinutes" type="number" min="0" max="720" required value="__OFF_MIN__">
+    <input id="offMinutes" name="offMinutes" type="number" min="1" max="720" required value="__OFF_MIN__">
 
     <button type="submit" class="btn">Apply &amp; Save Settings</button>
   </form>

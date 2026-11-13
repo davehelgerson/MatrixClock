@@ -7,8 +7,10 @@
 #include <time.h>
 
 const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = -18000;  // UTC-5 for EST, adjust for your timezone
-const int daylightOffset_sec = 3600;
+// POSIX TZ string so DST is applied only between the US switch dates
+// (configTime's fixed daylight offset would keep the clock on EDT all year).
+// Adjust for your timezone, e.g. "CST6CDT,M3.2.0,M11.1.0".
+const char* timeZone = "EST5EDT,M3.2.0,M11.1.0";
 
 static const unsigned long WIFI_CONNECT_TIMEOUT_MS = 15000UL;
 static const unsigned long RTC_RESYNC_INTERVAL_MS  = 30000UL;
@@ -21,7 +23,7 @@ bool CWDateTime::syncTimeNtp()
     return false;
   }
 
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  configTzTime(timeZone, ntpServer);
 
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo, 5000)) {
@@ -39,7 +41,11 @@ bool CWDateTime::syncTimeNtp()
   );
 
   {
-    I2CBus::Guard guard;
+    I2CBus::Guard guard(pdMS_TO_TICKS(1000));
+    if (!guard.locked()) {
+      Serial.println("I2C bus busy, RTC not updated");
+      return false;
+    }
     rtc.adjust(synced);
   }
 

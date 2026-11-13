@@ -198,7 +198,17 @@ void ClockApp::initClockfaces()
 
 void ClockApp::runTftTask()
 {
+  bool tftOn = true;
   while (1) {
+    bool wantOn = _tftOnRequested;
+    if (wantOn != tftOn) {
+      tftOn = wantOn;
+      if (tftOn) {
+        _gfx->displayOn();
+      } else {
+        _gfx->displayOff();
+      }
+    }
     if (_rotationDirty) {
       _rotationDirty = false;
       _gfx->setRotation(_tftRotation);
@@ -243,6 +253,16 @@ void ClockApp::runTimeTask()
         _clockfaces[activeIndex]->setup(&_dateTime);
       }
     }
+
+    // setBrightness rewrites OE bits across the DMA buffers, so it must not
+    // race with clockface drawing; apply it here on the drawing task.
+    // Atomic read-and-clear so a request written by Task_Control between the
+    // read and the reset can't be dropped.
+    int brightness = __atomic_exchange_n(&_matrixBrightnessRequested, -1, __ATOMIC_ACQ_REL);
+    if (brightness >= 0) {
+      _dmaDisplay->setBrightness(brightness);
+    }
+
     _clockfaces[activeIndex]->update();
     vTaskDelay(pdMS_TO_TICKS(5));
   }
@@ -272,9 +292,15 @@ void ClockApp::pollEncoder()
 
   if (step != 0) {
     portENTER_CRITICAL(&_encoderMux);
-    _encoderDelta += step;
-    if (_screenSleeping || _screenDimmed) {
+    if (_screenSleeping) {
+      // Both displays are dark: the first detent only wakes them, so the user
+      // doesn't change clockface/brightness without seeing it happen.
       _wakeRequested = true;
+    } else {
+      _encoderDelta += step;
+      if (_screenDimmed) {
+        _wakeRequested = true;
+      }
     }
     portEXIT_CRITICAL(&_encoderMux);
   }
@@ -300,8 +326,13 @@ void ClockApp::handleEncoder()
   } else if (page_index == 1) {
     int nextBrightness = constrain(_brightness + delta, 0, 100);
     _brightness = nextBrightness;
-    _dmaDisplay->setBrightness(map(nextBrightness, 0, 100, 0, 255));
+    requestMatrixBrightness(nextBrightness);
   }
+}
+
+void ClockApp::requestMatrixBrightness(int percent)
+{
+  _matrixBrightnessRequested = map(percent, 0, 100, 0, 255);
 }
 
 void ClockApp::handlePowerState()
@@ -314,17 +345,17 @@ void ClockApp::handlePowerState()
       idleTime >= static_cast<unsigned long>(offMin) * 60000UL) {
     _screenSleeping = true;
     _screenDimmed = false;
-    _gfx->displayOff();
-    _dmaDisplay->setBrightness(0);
+    _tftOnRequested = false;
+    _matrixBrightnessRequested = 0;
   } else if (!_screenSleeping && !_screenDimmed &&
              idleTime >= static_cast<unsigned long>(dimMin) * 60000UL && _brightness > 5) {
     _screenDimmed = true;
-    _dmaDisplay->setBrightness(map(5, 0, 100, 0, 255));
+    requestMatrixBrightness(5);
   }
 
   if (_wakeRequested) {
-    _gfx->displayOn();
-    _dmaDisplay->setBrightness(map(_brightness, 0, 100, 0, 255));
+    _tftOnRequested = true;
+    requestMatrixBrightness(_brightness);
     _lastActivityMillis = millis();
     _wakeRequested = false;
     _screenSleeping = false;
@@ -402,33 +433,47 @@ void ClockApp::readTouchpad(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 {
   int touchX = 0, touchY = 0;
 
-  if (read_touch(&touchX, &touchY) == 1) {
-    data->state = LV_INDEV_STATE_PR;
-    switch (_tftRotation) {
-      case 0:
-        data->point.x = (uint16_t)touchX;
-        data->point.y = (uint16_t)touchY;
-        break;
-      case 1:
-        data->point.x = (uint16_t)touchY;
-        data->point.y = (uint16_t)(TFT_HEIGHT - touchX);
-        break;
-      case 2:
-        data->point.x = (uint16_t)(TFT_WIDTH - touchX);
-        data->point.y = (uint16_t)(TFT_HEIGHT - touchY);
-        break;
-      case 3:
-      default:
-        data->point.x = (uint16_t)(TFT_WIDTH - touchY);
-        data->point.y = (uint16_t)touchX;
-        break;
-    }
-
-    if (_screenSleeping || _screenDimmed) {
-      _wakeRequested = true;
-    }
-  } else {
+  if (read_touch(&touchX, &touchY) != 1) {
+    _touchSuppressed = false;
     data->state = LV_INDEV_STATE_REL;
+    return;
+  }
+
+  // Any touch counts as user activity so the idle dim/off timers restart.
+  _lastActivityMillis = millis();
+
+  if (_screenSleeping || _touchSuppressed) {
+    // A tap on the dark screen only wakes it; swallow the press until the
+    // finger lifts so it can't trigger whatever widget is under it.
+    _wakeRequested = true;
+    _touchSuppressed = true;
+    data->state = LV_INDEV_STATE_REL;
+    return;
+  }
+
+  data->state = LV_INDEV_STATE_PR;
+  switch (_tftRotation) {
+    case 0:
+      data->point.x = (uint16_t)touchX;
+      data->point.y = (uint16_t)touchY;
+      break;
+    case 1:
+      data->point.x = (uint16_t)touchY;
+      data->point.y = (uint16_t)(TFT_HEIGHT - touchX);
+      break;
+    case 2:
+      data->point.x = (uint16_t)(TFT_WIDTH - touchX);
+      data->point.y = (uint16_t)(TFT_HEIGHT - touchY);
+      break;
+    case 3:
+    default:
+      data->point.x = (uint16_t)(TFT_WIDTH - touchY);
+      data->point.y = (uint16_t)touchX;
+      break;
+  }
+
+  if (_screenDimmed) {
+    _wakeRequested = true;
   }
 }
 
