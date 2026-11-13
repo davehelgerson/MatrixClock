@@ -219,7 +219,8 @@ void WifiClockface::handleRoot()
   WifiConfig::load(_savedSsid, dummyPass);
 
   String html = FPSTR(INDEX_HTML);
-  html.replace("__SAVED_SSID__", escapeHtml(_savedSsid));
+  String savedLabel = (_savedSsid.length() > 0) ? escapeHtml(_savedSsid) : String("Not configured");
+  html.replace("__SAVED_SSID__", savedLabel);
   html.replace("__SAVED_SSID_ATTR__", escapeHtml(_savedSsid));
 
   _server->send(200, "text/html", html);
@@ -335,7 +336,7 @@ void WifiClockface::drawScreen()
   drawCompactIp(36, "192.168.4.1", COLOR_WHITE);
   drawCenteredText(46, _statusLine, _statusColor);
 
-  String footer = _savedSsid;
+  String footer = (_savedSsid.length() > 0) ? _savedSsid : String("NO WIFI");
   if (footer.length() > 10) {
     footer = footer.substring(0, 10);
   }

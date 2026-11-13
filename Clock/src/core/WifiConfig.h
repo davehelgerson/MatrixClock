@@ -4,19 +4,14 @@
 #include <Arduino.h>
 
 /**
- * Persists and retrieves home WiFi credentials in ESP32 NVS storage,
- * falling back to built-in defaults if no credentials have been saved.
+ * Persists and retrieves home WiFi credentials in ESP32 NVS storage.
  */
 class WifiConfig
 {
   public:
-    static constexpr const char *DEFAULT_SSID     = "HWIFI_LAB";
-    static constexpr const char *DEFAULT_PASSWORD = "TestTest1";
-
-    static void load(String &ssid, String &password);
+    static bool load(String &ssid, String &password);
     static bool save(const String &ssid, const String &password);
     static bool hasSavedCredentials();
 };
 
 #endif
-

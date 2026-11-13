@@ -67,24 +67,29 @@ void CWDateTime::begin()
 
   String ssid;
   String password;
-  WifiConfig::load(ssid, password);
+  if (WifiConfig::load(ssid, password)) {
+    // Connect to WiFi with timeout so offline boot still uses RTC time
+    Serial.print("Connecting to WiFi");
+    WiFi.persistent(false);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid.c_str(), password.c_str());
+    unsigned long wifiStart = millis();
+    while (WiFi.status() != WL_CONNECTED && (millis() - wifiStart) < WIFI_CONNECT_TIMEOUT_MS) {
+      delay(500);
+      Serial.print(".");
+    }
 
-  // Connect to WiFi with timeout so offline boot still uses RTC time
-  Serial.print("Connecting to WiFi");
-  WiFi.persistent(false);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid.c_str(), password.c_str());
-  unsigned long wifiStart = millis();
-  while (WiFi.status() != WL_CONNECTED && (millis() - wifiStart) < WIFI_CONNECT_TIMEOUT_MS) {
-    delay(500);
-    Serial.print(".");
-  }
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println(" connected");
+      syncTimeNtp();
+    } else {
+      Serial.println(" WiFi timeout, using existing RTC time");
+    }
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println(" connected");
-    syncTimeNtp();
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
   } else {
-    Serial.println(" WiFi timeout, using existing RTC time");
+    Serial.println("No saved WiFi configured, using existing RTC time");
   }
 
   {
@@ -95,9 +100,6 @@ void CWDateTime::begin()
     Serial.println("RTC ready");
     Serial.println(current.timestamp());
   }
-
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
 }
 
 DateTime CWDateTime::now()

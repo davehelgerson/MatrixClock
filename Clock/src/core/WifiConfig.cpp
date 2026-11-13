@@ -7,26 +7,27 @@ const char *KEY_SSID       = "ssid";
 const char *KEY_PASSWORD   = "pass";
 }
 
-void WifiConfig::load(String &ssid, String &password)
+bool WifiConfig::load(String &ssid, String &password)
 {
+  ssid = "";
+  password = "";
+
   Preferences prefs;
   if (!prefs.begin(PREF_NAMESPACE, true)) {
-    ssid = DEFAULT_SSID;
-    password = DEFAULT_PASSWORD;
-    return;
+    return false;
   }
 
   String savedSsid = prefs.getString(KEY_SSID, "");
   String savedPass = prefs.getString(KEY_PASSWORD, "");
   prefs.end();
 
-  if (savedSsid.length() > 0) {
-    ssid = savedSsid;
-    password = savedPass;
-  } else {
-    ssid = DEFAULT_SSID;
-    password = DEFAULT_PASSWORD;
+  if (savedSsid.length() == 0) {
+    return false;
   }
+
+  ssid = savedSsid;
+  password = savedPass;
+  return true;
 }
 
 bool WifiConfig::save(const String &ssid, const String &password)
@@ -57,4 +58,3 @@ bool WifiConfig::hasSavedCredentials()
   prefs.end();
   return savedSsid.length() > 0;
 }
-

@@ -10,6 +10,36 @@ int page_index = 0;
 ClockApp clockApp;
 
 namespace {
+  enum EncoderState : uint8_t {
+    ENC_START_00 = 0,
+    ENC_CW_00    = 1,
+    ENC_CCW_00   = 2,
+    ENC_START_11 = 3,
+    ENC_CW_11    = 4,
+    ENC_CCW_11   = 5
+  };
+
+  // Buxton half-step quadrature transition tables indexed by [state][ab],
+  // where ab = (CLK << 1) | DT. Monitoring both pins cancels mechanical
+  // contact bounce cleanly without skipping or reversing steps.
+  DRAM_ATTR const uint8_t ENCODER_NEXT_STATE[6][4] = {
+    {ENC_START_00, ENC_CW_00,  ENC_CCW_00, ENC_START_11},
+    {ENC_START_00, ENC_CW_00,  ENC_CCW_00, ENC_START_11},
+    {ENC_START_00, ENC_CW_00,  ENC_CCW_00, ENC_START_11},
+    {ENC_START_00, ENC_CCW_11, ENC_CW_11,  ENC_START_11},
+    {ENC_START_00, ENC_CCW_11, ENC_CW_11,  ENC_START_11},
+    {ENC_START_00, ENC_CCW_11, ENC_CW_11,  ENC_START_11}
+  };
+
+  DRAM_ATTR const int8_t ENCODER_STEP[6][4] = {
+    {  0,  0,  0,  0},
+    {  0,  0,  0,  1},
+    {  0,  0,  0, -1},
+    {  0,  0,  0,  0},
+    {  1,  0,  0,  0},
+    { -1,  0,  0,  0}
+  };
+
   void dispFlushThunk(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
     clockApp.flushDisplay(disp, area, color_p);
   }
@@ -65,9 +95,12 @@ void ClockApp::initPins()
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(ENCODER_CLK, INPUT_PULLUP);
   pinMode(ENCODER_DT, INPUT_PULLUP);
-  _oldEncoderState = digitalRead(ENCODER_CLK);
+
+  uint8_t ab = ((uint8_t)digitalRead(ENCODER_CLK) << 1) | (uint8_t)digitalRead(ENCODER_DT);
+  _encoderState = (ab == 0) ? ENC_START_00 : ENC_START_11;
 
   attachInterrupt(ENCODER_CLK, encoderIsrThunk, CHANGE);
+  attachInterrupt(ENCODER_DT, encoderIsrThunk, CHANGE);
 }
 
 void ClockApp::initTft()
@@ -95,6 +128,7 @@ void ClockApp::initTft()
   lv_indev_drv_register(&indevDrv);
 
   ui_init();
+  lv_obj_set_style_anim_time(ui_Roller1, 120, LV_PART_MAIN);
 }
 
 void ClockApp::initMatrix()
@@ -124,7 +158,7 @@ void ClockApp::runTftTask()
   while (1) {
     updateUiWidgets();
     lv_timer_handler();
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
@@ -133,7 +167,7 @@ void ClockApp::runControlTask()
   while (1) {
     handleEncoder();
     handlePowerState();
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
@@ -158,21 +192,19 @@ void ClockApp::runTimeTask()
 
 void IRAM_ATTR ClockApp::onEncoderEdge()
 {
-  int state = digitalRead(ENCODER_CLK);
-  if (state != _oldEncoderState) {
-    portENTER_CRITICAL_ISR(&_encoderMux);
-    if (digitalRead(ENCODER_DT) == state) {
-      _encoderDelta++;
-    } else {
-      _encoderDelta--;
-    }
-    portEXIT_CRITICAL_ISR(&_encoderMux);
+  uint8_t ab = ((uint8_t)digitalRead(ENCODER_CLK) << 1) | (uint8_t)digitalRead(ENCODER_DT);
 
+  portENTER_CRITICAL_ISR(&_encoderMux);
+  uint8_t state = _encoderState;
+  int8_t step = ENCODER_STEP[state][ab];
+  _encoderState = ENCODER_NEXT_STATE[state][ab];
+  if (step != 0) {
+    _encoderDelta += step;
     if (_screenSleeping || _screenDimmed) {
       _wakeRequested = true;
     }
   }
-  _oldEncoderState = state;
+  portEXIT_CRITICAL_ISR(&_encoderMux);
 }
 
 void ClockApp::handleEncoder()
@@ -238,7 +270,8 @@ void ClockApp::updateUiWidgets()
   int curBrightness = _brightness;
 
   if (curPage == 0 && (curPage != lastPage || curGif != lastGif)) {
-    lv_roller_set_selected(ui_Roller1, curGif, LV_ANIM_ON);
+    lv_anim_enable_t anim = (curPage != lastPage) ? LV_ANIM_OFF : LV_ANIM_ON;
+    lv_roller_set_selected(ui_Roller1, curGif, anim);
     lastGif = curGif;
     lastPage = curPage;
   } else if (curPage == 1 && (curPage != lastPage || curBrightness != lastBrightness)) {

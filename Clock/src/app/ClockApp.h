@@ -40,7 +40,7 @@ class ClockApp {
 
     portMUX_TYPE _encoderMux = portMUX_INITIALIZER_UNLOCKED;
     volatile int _encoderDelta = 0;
-    int _oldEncoderState = HIGH;
+    volatile uint8_t _encoderState = 3;
 
     volatile int _brightness = 30;
     volatile int _gifIndex = 0;
