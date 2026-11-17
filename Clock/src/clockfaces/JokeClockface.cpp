@@ -88,32 +88,10 @@ void JokeClockface::drawHeader()
 {
   if (!_display) return;
 
-  // Cute 5x5 smiley icon at top-left (2, 2)
-  const uint8_t smiley[5] = {
-    0b01110,
-    0b10001,
-    0b11011,
-    0b10001,
-    0b01110
-  };
-  for (int r = 0; r < 5; r++) {
-    for (int c = 0; c < 5; c++) {
-      if (smiley[r] & (1 << (4 - c))) {
-        bool eye = (r == 1 && (c == 1 || c == 3));
-        _display->drawPixel(2 + c, 2 + r, eye ? COLOR_BLACK : COLOR_GOLD);
-      }
-    }
-  }
-  _display->drawPixel(3, 3, COLOR_GOLD);
-  _display->drawPixel(5, 3, COLOR_GOLD);
-  _display->drawFastHLine(3, 5, 3, COLOR_BLACK);
-  _display->drawPixel(3, 4, COLOR_BLACK);
-  _display->drawPixel(5, 4, COLOR_BLACK);
-
   _display->setFont(&Picopixel);
   _display->setTextSize(1);
   _display->setTextColor(COLOR_GOLD);
-  _display->setCursor(10, 6);
+  _display->setCursor(3, 7);
   _display->print("DAILY JOKE");
 }
 
@@ -134,10 +112,10 @@ void JokeClockface::updateClock()
   _lastMinute = minute;
   _lastIsAM = am;
 
-  _display->fillRect(0, 55, 64, 9, COLOR_BLACK);
+  _display->fillRect(0, 54, 64, 10, COLOR_BLACK);
 
-  int16_t x = 2;
-  const int16_t y = 57;
+  int16_t x = 3;
+  const int16_t y = 56;
   if (h12 >= 10) {
     drawCompactClockDigit(_display, h12 / 10, x, y, COLOR_WHITE, 1);
     x += 4;
