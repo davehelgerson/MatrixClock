@@ -213,12 +213,14 @@ void Pacman2Clockface::update()
     if (fullBlock) {
       int col = (_pacman->getX() - 2) / 5;
       int row = (_pacman->getY() - 2) / 5;
-      MapBlock currentBlk = static_cast<MapBlock>(_MAP[row][col]);
-      _MAP[row][col] = MapBlock::EMPTY;
+      if (col >= 0 && col < MAP_SIZE && row >= 0 && row < MAP_SIZE) {
+        MapBlock currentBlk = static_cast<MapBlock>(_MAP[row][col]);
+        _MAP[row][col] = MapBlock::EMPTY;
 
-      if (currentBlk == MapBlock::SUPER_FOOD) {
-        _pacman->setState(Pacman::State::INVENCIBLE);
-        _invincibleStartMillis = millis();
+        if (currentBlk == MapBlock::SUPER_FOOD) {
+          _pacman->setState(Pacman::State::INVENCIBLE);
+          _invincibleStartMillis = millis();
+        }
       }
 
       if (countBlocks(MapBlock::FOOD) == 0) {
@@ -502,6 +504,9 @@ bool Pacman2Clockface::isTunnelRow(int row) const
 
 bool Pacman2Clockface::stepCell(int col, int row, Direction dir, int &outCol, int &outRow) const
 {
+  if (col < 0 || col >= MAP_SIZE || row < 0 || row >= MAP_SIZE) {
+    return false;
+  }
   outCol = col;
   outRow = row;
 
@@ -568,7 +573,11 @@ const char* Pacman2Clockface::weekDayName(int weekday)
 
 const char* Pacman2Clockface::monthName(int month)
 {
+  if (month < 1 || month > 12) {
+    return "---";
+  }
   strncpy(monthTemp, _monthWords + ((month - 1) * 4), 4);
+  monthTemp[3] = '\0';
   return monthTemp;
 }
 
@@ -699,11 +708,19 @@ bool Pacman2Clockface::contains(int v, const int* values)
 
 void Pacman2Clockface::turnRandom()
 {
-  int dir = random(4);
-  do {
+  for (int attempt = 0; attempt < 20; attempt++) {
+    int dir = random(4);
     _pacman->turn(static_cast<Direction>(dir));
-    dir = random(4);
-  } while (!contains(nextBlock(), PACMAN_MOVING_BLOCKS));
+    if (contains(nextBlock(), PACMAN_MOVING_BLOCKS)) {
+      return;
+    }
+  }
+  for (int d = 0; d < 4; d++) {
+    _pacman->turn(static_cast<Direction>(d));
+    if (contains(nextBlock(), PACMAN_MOVING_BLOCKS)) {
+      return;
+    }
+  }
 }
 
 int Pacman2Clockface::countBlocks(MapBlock elem)

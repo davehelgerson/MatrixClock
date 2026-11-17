@@ -372,7 +372,7 @@ void PipesClockface::stepPipe(int slot)
       }
     }
 
-    if (p.len >= p.targetLen || p.len >= MAX_PIPE_LEN) {
+    if (p.len >= p.targetLen || p.len >= MAX_PIPE_LEN - 1) {
       p.retracting = true;
     }
 
@@ -381,9 +381,11 @@ void PipesClockface::stepPipe(int slot)
     _occupied[p.gy][p.gx] = true;
     _hasTeapot[p.gy][p.gx] = false;
 
-    p.cells[p.headIdx] = {p.gx, p.gy};
-    p.headIdx = (p.headIdx + 1) % MAX_PIPE_LEN;
-    p.len++;
+    if (p.len < MAX_PIPE_LEN) {
+      p.cells[p.headIdx] = {p.gx, p.gy};
+      p.headIdx = (p.headIdx + 1) % MAX_PIPE_LEN;
+      p.len++;
+    }
   }
 
   drawPipeSlice(p.gx, p.gy, p.dir, p.style, p.stepCount, p.subStep);

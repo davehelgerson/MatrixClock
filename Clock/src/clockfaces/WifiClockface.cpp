@@ -463,7 +463,7 @@ void WifiClockface::handleRoot()
   uint16_t faceMask = WifiConfig::loadEnabledFacesMask();
   String faceCheckboxes;
   for (int i = 0; i < 12; ++i) {
-    bool checked = WifiConfig::isFaceEnabled(faceMask, i, 12);
+    bool checked = WifiConfig::isFaceEnabled(faceMask, i, WifiConfig::SETTINGS_FACE_INDEX);
     faceCheckboxes += "<label class='chk'><input type='checkbox' name='face_";
     faceCheckboxes += String(i);
     faceCheckboxes += "' value='1'";
@@ -675,17 +675,21 @@ void WifiClockface::handleDad()
   String rawSayings = _server->hasArg("sayings") ? _server->arg("sayings") : "";
 
   menuName.trim();
+  if (menuName.length() > 24) menuName = menuName.substring(0, 24);
   if (menuName.length() == 0) {
     menuName = WifiConfig::DEFAULT_DAD_MENU_NAME;
   }
+  if (topText.length() > 20) topText = topText.substring(0, 20);
+  if (botText.length() > 16) botText = botText.substring(0, 16);
 
   std::vector<String> sayings;
   int start = 0;
-  while (start <= (int)rawSayings.length()) {
+  while (start <= (int)rawSayings.length() && sayings.size() < 30) {
     int nl = rawSayings.indexOf('\n', start);
     String line = (nl < 0) ? rawSayings.substring(start) : rawSayings.substring(start, nl);
     line.replace("\r", "");
     line.trim();
+    if (line.length() > 120) line = line.substring(0, 120);
     if (line.length() > 0) {
       sayings.push_back(line);
     }
@@ -739,7 +743,7 @@ void WifiClockface::handleFaces()
     }
   }
 
-  WifiConfig::saveEnabledFacesMask(mask, 12);
+  WifiConfig::saveEnabledFacesMask(mask, WifiConfig::SETTINGS_FACE_INDEX);
   if (_onDadSettingsChanged) {
     _onDadSettingsChanged();
   }
@@ -1001,6 +1005,12 @@ String WifiClockface::escapeJson(const String &src)
     if (c == '\\' || c == '"') {
       out += '\\';
       out += c;
+    } else if (c == '<') {
+      out += "\\u003c";
+    } else if (c == '>') {
+      out += "\\u003e";
+    } else if (c == '&') {
+      out += "\\u0026";
     } else if (static_cast<unsigned char>(c) >= 0x20) {
       out += c;
     }

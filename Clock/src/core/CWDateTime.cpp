@@ -110,8 +110,12 @@ void CWDateTime::begin()
     if (WiFi.status() == WL_CONNECTED) {
       Serial.println(" connected");
       syncTimeNtp();
-      DateTime cur = now();
-      WifiConfig::fetchDailyJokeIfNeeded(cur.year(), cur.month(), cur.day(), false);
+      if (WifiConfig::isFaceEnabled(WifiConfig::loadEnabledFacesMask(),
+                                    WifiConfig::JOKE_FACE_INDEX,
+                                    WifiConfig::SETTINGS_FACE_INDEX)) {
+        DateTime cur = now();
+        WifiConfig::fetchDailyJokeIfNeeded(cur.year(), cur.month(), cur.day(), false);
+      }
     } else {
       Serial.println(" WiFi timeout, using existing RTC time");
     }

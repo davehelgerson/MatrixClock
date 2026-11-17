@@ -152,7 +152,11 @@ const char* Clockface2::weekDayName(int weekday)
 
 const char* Clockface2::monthName(int month)
 {
+  if (month < 1 || month > 12) {
+    return "---";
+  }
   strncpy(monthTemp, _monthWords + ((month - 1) * 4), 4);
+  monthTemp[3] = '\0';
   return monthTemp;
 }
 
@@ -189,11 +193,19 @@ bool Clockface2::contains(int v, const int* values)
 
 void Clockface2::turnRandom()
 {
-  int dir = random(4);
-  do {
+  for (int attempt = 0; attempt < 20; attempt++) {
+    int dir = random(4);
     _pacman->turn(static_cast<Direction>(dir));
-    dir = random(4);
-  } while (!contains(nextBlock(), PACMAN_MOVING_BLOCKS));
+    if (contains(nextBlock(), PACMAN_MOVING_BLOCKS)) {
+      return;
+    }
+  }
+  for (int d = 0; d < 4; d++) {
+    _pacman->turn(static_cast<Direction>(d));
+    if (contains(nextBlock(), PACMAN_MOVING_BLOCKS)) {
+      return;
+    }
+  }
 }
 
 int Clockface2::countBlocks(MapBlock elem)

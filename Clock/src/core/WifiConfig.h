@@ -23,6 +23,9 @@ class WifiConfig
     static constexpr const char *DEFAULT_DAD_TOP_TEXT  = "To Logan:";
     static constexpr const char *DEFAULT_DAD_BOT_TEXT  = "- Dad";
 
+    static constexpr int JOKE_FACE_INDEX     = 11;
+    static constexpr int SETTINGS_FACE_INDEX = 12;
+
     static uint16_t normalizeTimeoutMinutes(uint16_t minutes);
 
     static bool load(String &ssid, String &password);

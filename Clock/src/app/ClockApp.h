@@ -45,6 +45,7 @@ class ClockApp {
     lv_color_t _buf[TFT_WIDTH * TFT_HEIGHT / 10];
 
     portMUX_TYPE _encoderMux = portMUX_INITIALIZER_UNLOCKED;
+    portMUX_TYPE _menuMux = portMUX_INITIALIZER_UNLOCKED;
     esp_timer_handle_t _encoderTimer = nullptr;
     volatile int _encoderDelta = 0;
     uint8_t _encoderState = 0;

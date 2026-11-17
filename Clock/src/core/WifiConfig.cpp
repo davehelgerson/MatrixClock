@@ -563,7 +563,7 @@ bool WifiConfig::fetchDailyJokeIfNeeded(int year, int month, int day, bool conne
       WiFi.mode(WIFI_STA);
       WiFi.begin(ssid.c_str(), pass.c_str());
       unsigned long start = millis();
-      while (WiFi.status() != WL_CONNECTED && (millis() - start) < 10000UL) {
+      while (WiFi.status() != WL_CONNECTED && (millis() - start) < 6000UL) {
         delay(250);
       }
       weStartedWifi = true;
@@ -575,11 +575,24 @@ bool WifiConfig::fetchDailyJokeIfNeeded(int year, int month, int day, bool conne
     WiFiClientSecure client;
     client.setInsecure();
     HTTPClient http;
-    http.setTimeout(5000);
+    http.setTimeout(3000);
     if (http.begin(client, "https://v2.jokeapi.dev/joke/Pun,Misc?blacklistFlags=nsfw,religious,political,racist,sexist,explicit&safe-mode")) {
       int code = http.GET();
       if (code == HTTP_CODE_OK) {
-        String payload = http.getString();
+        // Cap HTTP body read to 1024 bytes to prevent heap exhaustion on unexpected responses
+        String payload;
+        payload.reserve(512);
+        WiFiClient *stream = http.getStreamPtr();
+        unsigned long readStart = millis();
+        while (stream && payload.length() < 1024 && (millis() - readStart) < 3000UL) {
+          while (stream->available() && payload.length() < 1024) {
+            payload += static_cast<char>(stream->read());
+          }
+          if (!http.connected() && !stream->available()) {
+            break;
+          }
+          delay(10);
+        }
         String single = extractJsonStringField(payload, "joke");
         if (single.length() > 0) {
           fetchedJoke = single;
@@ -604,9 +617,21 @@ bool WifiConfig::fetchDailyJokeIfNeeded(int year, int month, int day, bool conne
     fetchedJoke = getFallbackDailyJoke(year, month, day);
   }
 
-  fetchedJoke.replace("\n", " ");
-  fetchedJoke.replace("\r", "");
-  fetchedJoke.trim();
-  saveDailyJoke(today, fetchedJoke);
+  // Sanitize to printable ASCII and cap length
+  String cleanJoke;
+  cleanJoke.reserve(160);
+  for (size_t i = 0; i < fetchedJoke.length() && cleanJoke.length() < 160; ++i) {
+    unsigned char c = static_cast<unsigned char>(fetchedJoke[i]);
+    if (c == '\n' || c == '\r' || c == '\t') {
+      cleanJoke += ' ';
+    } else if (c >= 0x20 && c <= 0x7E) {
+      cleanJoke += static_cast<char>(c);
+    }
+  }
+  cleanJoke.trim();
+  if (cleanJoke.length() == 0) {
+    cleanJoke = getFallbackDailyJoke(year, month, day);
+  }
+  saveDailyJoke(today, cleanJoke);
   return true;
 }

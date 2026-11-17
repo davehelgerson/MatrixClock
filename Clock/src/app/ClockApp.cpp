@@ -16,7 +16,7 @@ int page_index = 0;
 ClockApp clockApp;
 
 namespace {
-  const int SETTINGS_FACE_INDEX = 12;
+  const int SETTINGS_FACE_INDEX = WifiConfig::SETTINGS_FACE_INDEX;
 
   enum EncoderState : uint8_t {
     ENC_START     = 0,
@@ -118,7 +118,7 @@ void ClockApp::begin()
   xTaskCreatePinnedToCore(tftTaskThunk, "Task_TFT", 10240, nullptr, 2, nullptr, 0);
   xTaskCreatePinnedToCore(controlTaskThunk, "Task_Control", 4096, nullptr, 1, nullptr, 0);
   delay(2500); // Allow boot logo screen animation to finish before driving the matrix
-  xTaskCreatePinnedToCore(timeTaskThunk, "Task_Time", 16384, nullptr, 1, nullptr, 1);
+  xTaskCreatePinnedToCore(timeTaskThunk, "Task_Time", 20480, nullptr, 1, nullptr, 1);
 }
 
 void ClockApp::initPins()
@@ -342,12 +342,14 @@ void ClockApp::handleEncoder()
   _lastActivityMillis = millis();
 
   if (page_index == 0) {
+    portENTER_CRITICAL(&_menuMux);
     if (_visibleCount > 0) {
       int curPos = rollerPositionForFace(_gifIndex);
       int nextPos = ((curPos + delta) % _visibleCount + _visibleCount) % _visibleCount;
       _gifIndex = _visibleFaces[nextPos];
       Serial.printf("enc delta=%d -> gif_num=%d (pos=%d)\n", delta, _gifIndex, nextPos);
     }
+    portEXIT_CRITICAL(&_menuMux);
   } else if (page_index == 1) {
     int nextBrightness = constrain(_brightness + delta, 0, 100);
     _brightness = nextBrightness;
@@ -399,8 +401,10 @@ void ClockApp::updateUiWidgets()
   int curBrightness = _brightness;
 
   if (curPage == 0) {
+    portENTER_CRITICAL(&_menuMux);
     int targetPos = rollerPositionForFace(curGif);
     int lastPos = (lastGif >= 0) ? rollerPositionForFace(lastGif) : -1;
+    portEXIT_CRITICAL(&_menuMux);
     bool needsSync = (curPage != lastPage) || (curGif != lastGif) ||
                      (static_cast<int>(lv_roller_get_selected(ui_Roller1)) != targetPos);
     if (needsSync) {
@@ -472,28 +476,36 @@ void ClockApp::rebuildVisibleMenu(bool animateOff)
 
   uint16_t mask = WifiConfig::loadEnabledFacesMask();
   String rollerOpts;
-  _visibleCount = 0;
+  int nextFaces[CLOCKFACE_COUNT] = {0};
+  int nextCount = 0;
 
   for (int i = 0; i < CLOCKFACE_COUNT; ++i) {
     if (WifiConfig::isFaceEnabled(mask, i, SETTINGS_FACE_INDEX)) {
-      if (_visibleCount > 0) rollerOpts += "\n";
+      if (nextCount > 0) rollerOpts += "\n";
       rollerOpts += labels[i];
-      _visibleFaces[_visibleCount++] = i;
+      nextFaces[nextCount++] = i;
     }
   }
 
-  if (_visibleCount == 0) {
+  if (nextCount == 0) {
     rollerOpts = "Settings";
-    _visibleFaces[0] = SETTINGS_FACE_INDEX;
-    _visibleCount = 1;
+    nextFaces[0] = SETTINGS_FACE_INDEX;
+    nextCount = 1;
   }
 
+  portENTER_CRITICAL(&_menuMux);
+  for (int i = 0; i < nextCount; ++i) {
+    _visibleFaces[i] = nextFaces[i];
+  }
+  _visibleCount = nextCount;
   if (!WifiConfig::isFaceEnabled(mask, _gifIndex, SETTINGS_FACE_INDEX)) {
     _gifIndex = _visibleFaces[0];
   }
+  int selectedPos = rollerPositionForFace(_gifIndex);
+  portEXIT_CRITICAL(&_menuMux);
 
   lv_roller_set_options(ui_Roller1, rollerOpts.c_str(), LV_ROLLER_MODE_INFINITE);
-  lv_roller_set_selected(ui_Roller1, rollerPositionForFace(_gifIndex), LV_ANIM_OFF);
+  lv_roller_set_selected(ui_Roller1, selectedPos, LV_ANIM_OFF);
 }
 
 void ClockApp::setPowerTimeouts(uint16_t dimMinutes, uint16_t offMinutes)
