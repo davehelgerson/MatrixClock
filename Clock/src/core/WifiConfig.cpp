@@ -3,6 +3,33 @@
 
 namespace {
 const char *PREF_NAMESPACE = "wifi";
+const char *DAD_NAMESPACE  = "dad";
+const char *KEY_DAD_MENU   = "menu";
+const char *KEY_DAD_TOP    = "top";
+const char *KEY_DAD_BOT    = "bot";
+const char *KEY_DAD_SAY    = "sayings";
+
+const char *const DEFAULT_DAD_SAYINGS[] = {
+  "I love you!",
+  "You are the best son!",
+  "You are amazing!",
+  "I love your creativity!",
+  "I'm proud of you!",
+  "You're my favorite human!",
+  "You are the son I always wanted!",
+  "You make me happy every day!",
+  "You're braver than you know!",
+  "I'm so happy that you are my son!",
+  "I'm here for you!",
+  "I'm lucky to be your dad!",
+  "I love adventures with you!",
+  "Your smile brightens my day!",
+  "Remember to always be kind!",
+  "I'm always cheering for you!",
+  "Thank you for being you!",
+  "You are courageous and strong!"
+};
+constexpr size_t DEFAULT_DAD_SAYINGS_COUNT = sizeof(DEFAULT_DAD_SAYINGS) / sizeof(DEFAULT_DAD_SAYINGS[0]);
 const char *KEY_SSID       = "ssid";
 const char *KEY_PASSWORD   = "pass";
 const char *KEY_ROTATION   = "rot";
@@ -223,4 +250,138 @@ const char *WifiConfig::getPosixTimeZone()
   uint8_t idx = loadTimeZoneIndex();
   bool dst = loadDstEnabled();
   return dst ? TIME_ZONES[idx].posixDst : TIME_ZONES[idx].posixStd;
+}
+
+static String loadDadStr(const char *key, const char *defVal)
+{
+  Preferences prefs;
+  if (!prefs.begin(DAD_NAMESPACE, true)) {
+    return String(defVal);
+  }
+  String val = prefs.getString(key, defVal);
+  prefs.end();
+  return val;
+}
+
+static bool saveDadStr(const char *key, const String &val)
+{
+  Preferences prefs;
+  if (!prefs.begin(DAD_NAMESPACE, false)) {
+    return false;
+  }
+  prefs.putString(key, val);
+  prefs.end();
+  return true;
+}
+
+String WifiConfig::loadDadMenuName()
+{
+  String s = loadDadStr(KEY_DAD_MENU, DEFAULT_DAD_MENU_NAME);
+  s.replace("\n", " ");
+  s.replace("\r", "");
+  s.trim();
+  return (s.length() > 0) ? s : String(DEFAULT_DAD_MENU_NAME);
+}
+
+bool WifiConfig::saveDadMenuName(const String &name)
+{
+  String s = name;
+  s.replace("\n", " ");
+  s.replace("\r", "");
+  s.trim();
+  if (s.length() == 0) {
+    s = DEFAULT_DAD_MENU_NAME;
+  }
+  return saveDadStr(KEY_DAD_MENU, s);
+}
+
+String WifiConfig::loadDadTopText()
+{
+  return loadDadStr(KEY_DAD_TOP, DEFAULT_DAD_TOP_TEXT);
+}
+
+bool WifiConfig::saveDadTopText(const String &text)
+{
+  return saveDadStr(KEY_DAD_TOP, text);
+}
+
+String WifiConfig::loadDadBottomText()
+{
+  return loadDadStr(KEY_DAD_BOT, DEFAULT_DAD_BOT_TEXT);
+}
+
+bool WifiConfig::saveDadBottomText(const String &text)
+{
+  return saveDadStr(KEY_DAD_BOT, text);
+}
+
+void WifiConfig::loadDefaultDadSayings(std::vector<String> &out)
+{
+  out.clear();
+  out.reserve(DEFAULT_DAD_SAYINGS_COUNT);
+  for (size_t i = 0; i < DEFAULT_DAD_SAYINGS_COUNT; ++i) {
+    out.emplace_back(DEFAULT_DAD_SAYINGS[i]);
+  }
+}
+
+void WifiConfig::loadDadSayings(std::vector<String> &out)
+{
+  out.clear();
+  Preferences prefs;
+  if (!prefs.begin(DAD_NAMESPACE, true)) {
+    loadDefaultDadSayings(out);
+    return;
+  }
+
+  if (!prefs.isKey(KEY_DAD_SAY)) {
+    prefs.end();
+    loadDefaultDadSayings(out);
+    return;
+  }
+
+  String raw = prefs.getString(KEY_DAD_SAY, "");
+  prefs.end();
+
+  int start = 0;
+  while (start <= (int)raw.length()) {
+    int nl = raw.indexOf('\n', start);
+    String line = (nl < 0) ? raw.substring(start) : raw.substring(start, nl);
+    line.replace("\r", "");
+    line.trim();
+    if (line.length() > 0) {
+      out.push_back(line);
+    }
+    if (nl < 0) break;
+    start = nl + 1;
+  }
+
+  if (out.empty()) {
+    loadDefaultDadSayings(out);
+  }
+}
+
+bool WifiConfig::saveDadSayings(const std::vector<String> &sayings)
+{
+  String joined;
+  for (size_t i = 0; i < sayings.size(); ++i) {
+    String line = sayings[i];
+    line.replace("\r", "");
+    line.replace("\n", " ");
+    line.trim();
+    if (line.length() == 0) continue;
+    if (joined.length() > 0) joined += "\n";
+    joined += line;
+  }
+
+  Preferences prefs;
+  if (!prefs.begin(DAD_NAMESPACE, false)) {
+    return false;
+  }
+  if (joined.length() == 0) {
+    prefs.remove(KEY_DAD_SAY);
+  } else {
+    prefs.putString(KEY_DAD_SAY, joined);
+  }
+  prefs.end();
+  return true;
 }

@@ -22,6 +22,7 @@ class ClockApp {
     void readTouchpad(lv_indev_drv_t *indev_driver, lv_indev_data_t *data);
     void setTftRotation(uint8_t rotation);
     void setPowerTimeouts(uint16_t dimMinutes, uint16_t offMinutes);
+    void refreshMenuLabels();
 
   private:
     static const uint16_t TFT_WIDTH  = 240;
@@ -58,6 +59,7 @@ class ClockApp {
     volatile bool _wakeRequested = false;
     volatile uint8_t _tftRotation = 3;
     volatile bool _rotationDirty = false;
+    volatile bool _rollerOptionsDirty = false;
     volatile uint16_t _dimMinutes = 5;
     volatile uint16_t _offMinutes = 15;
 

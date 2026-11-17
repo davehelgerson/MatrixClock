@@ -37,19 +37,27 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 <style>
   *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
   body{margin:0;padding:16px;background:#0f172a;color:#e2e8f0;display:flex;justify-content:center}
-  .stack{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px}
+  .stack{width:100%;max-width:440px;display:flex;flex-direction:column;gap:12px}
   .card{width:100%;background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;box-shadow:0 10px 25px rgba(0,0,0,.35)}
-  h1{margin:0 0 6px;font-size:1.25rem;color:#38bdf8}
+  h1{margin:0 0 10px;font-size:1.25rem;color:#38bdf8}
   h2{margin:0 0 8px;font-size:1.05rem;color:#38bdf8}
-  p.sub{margin:0 0 16px;font-size:.9rem;color:#94a3b8}
+  p.sub{margin:0 0 14px;font-size:.9rem;color:#94a3b8}
+  .tabs{display:flex;gap:6px;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:6px}
+  .tab{flex:1;padding:9px 6px;border:0;border-radius:8px;background:transparent;color:#94a3b8;font-size:.9rem;font-weight:600;cursor:pointer}
+  .tab.active{background:#0284c7;color:#fff}
+  .panel{display:none}
+  .panel.active{display:block}
   .saved{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:.88rem}
   label{display:block;font-size:.85rem;color:#cbd5e1;margin:12px 0 6px}
-  select,input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#f8fafc;font-size:1rem}
+  select,input,textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#f8fafc;font-size:1rem}
   .row{display:flex;gap:8px;align-items:center}
   .btn{width:100%;margin-top:16px;padding:11px;border:0;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;background:#0284c7;color:#fff}
   .btn:hover{background:#0369a1}
   .btn-sec{width:auto;margin-top:0;padding:10px 12px;background:#334155;color:#e2e8f0;white-space:nowrap}
   .btn-sec:hover{background:#475569}
+  .btn-del{width:auto;margin-top:0;padding:9px 12px;background:#7f1d1d;color:#fecaca;border:0;border-radius:8px;cursor:pointer;font-weight:700}
+  .btn-del:hover{background:#991b1b}
+  .saying-list{display:flex;flex-direction:column;gap:8px;margin-top:6px}
   .chk{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:.85rem;color:#94a3b8}
   .chk input{width:auto}
   .status{margin-top:10px;font-size:.85rem;color:#38bdf8;min-height:1.2em}
@@ -57,8 +65,15 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 </head>
 <body>
 <div class="stack">
-<div class="card">
-  <h1>MatrixClock Settings</h1>
+<div class="tabs" role="tablist">
+  <button type="button" class="tab active" data-tab="wifi" onclick="switchTab('wifi')">WiFi</button>
+  <button type="button" class="tab" data-tab="display" onclick="switchTab('display')">Display</button>
+  <button type="button" class="tab" data-tab="time" onclick="switchTab('time')">Time</button>
+  <button type="button" class="tab" data-tab="dad" onclick="switchTab('dad')">Dad</button>
+</div>
+
+<div class="card panel active" id="panel-wifi">
+  <h1>MatrixClock WiFi</h1>
   <p class="sub">Select your home WiFi network and save credentials.</p>
   <div class="saved">Saved network: <strong id="savedSsid">__SAVED_SSID__</strong></div>
   <form method="POST" action="/save">
@@ -82,7 +97,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
   </form>
 </div>
 
-<div class="card">
+<div class="card panel" id="panel-display">
   <h2>Display &amp; Power</h2>
   <p class="sub">Rotate the menu dial or adjust idle dim and display off timers.</p>
   <form method="POST" action="/display">
@@ -104,7 +119,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
   </form>
 </div>
 
-<div class="card">
+<div class="card panel" id="panel-time">
   <h2>Time Zone &amp; DST</h2>
   <p class="sub">Choose your time zone and whether Daylight Saving Time adjusts automatically.</p>
   <div class="saved">Clock display time: <strong id="clockTime">__CLOCK_TIME__</strong></div>
@@ -117,8 +132,88 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     <button type="submit" class="btn">Save Time Zone</button>
   </form>
 </div>
+
+<div class="card panel" id="panel-dad">
+  <h2>Dad Clock Face</h2>
+  <p class="sub">Customize the menu name, header/footer text, and scrolling sayings.</p>
+  <form method="POST" action="/dad" onsubmit="return prepareDadForm()">
+    <label for="dadMenu">Menu Name</label>
+    <input id="dadMenu" name="menuName" type="text" required maxlength="24" value="__DAD_MENU__" placeholder="Dad">
+
+    <label for="dadTop">Top Text</label>
+    <input id="dadTop" name="topText" type="text" maxlength="20" value="__DAD_TOP__" placeholder="To Logan:">
+
+    <label for="dadBot">Bottom Text</label>
+    <input id="dadBot" name="bottomText" type="text" maxlength="16" value="__DAD_BOT__" placeholder="- Dad">
+
+    <label>Scrolling Sayings</label>
+    <div id="sayingList" class="saying-list"></div>
+
+    <label for="newSaying">Add Saying</label>
+    <div class="row">
+      <input id="newSaying" type="text" maxlength="120" placeholder="Enter a new saying...">
+      <button type="button" class="btn btn-sec" onclick="addSaying()">Add</button>
+    </div>
+
+    <textarea id="sayingsHidden" name="sayings" style="display:none"></textarea>
+    <div class="row" style="margin-top:16px">
+      <button type="button" class="btn btn-sec" onclick="resetDadDefaults()">Reset Defaults</button>
+      <button type="submit" class="btn" style="margin-top:0">Save Dad Settings</button>
+    </div>
+  </form>
+</div>
 </div>
 <script>
+var dadSayings=__DAD_SAYINGS_JSON__;
+var dadDefaultSayings=__DAD_DEFAULT_SAYINGS_JSON__;
+function switchTab(name){
+  var tabs=document.querySelectorAll('.tab');
+  var panels=document.querySelectorAll('.panel');
+  tabs.forEach(function(t){t.classList.toggle('active',t.getAttribute('data-tab')===name);});
+  panels.forEach(function(p){p.classList.toggle('active',p.id==='panel-'+name);});
+}
+function renderSayings(){
+  var list=document.getElementById('sayingList');
+  list.innerHTML='';
+  dadSayings.forEach(function(text,idx){
+    var row=document.createElement('div');
+    row.className='row';
+    var inp=document.createElement('input');
+    inp.type='text';
+    inp.maxLength=120;
+    inp.value=text;
+    inp.oninput=function(){dadSayings[idx]=this.value;};
+    var del=document.createElement('button');
+    del.type='button';
+    del.className='btn-del';
+    del.textContent='X';
+    del.title='Remove saying';
+    del.onclick=function(){dadSayings.splice(idx,1);renderSayings();};
+    row.appendChild(inp);
+    row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+function addSaying(){
+  var inp=document.getElementById('newSaying');
+  var val=inp.value.trim();
+  if(!val){return;}
+  dadSayings.push(val);
+  inp.value='';
+  renderSayings();
+}
+function resetDadDefaults(){
+  document.getElementById('dadMenu').value='Dad';
+  document.getElementById('dadTop').value='To Logan:';
+  document.getElementById('dadBot').value='- Dad';
+  dadSayings=dadDefaultSayings.slice();
+  renderSayings();
+}
+function prepareDadForm(){
+  var cleaned=dadSayings.map(function(s){return s.replace(/[\r\n]+/g,' ').trim();}).filter(function(s){return s.length>0;});
+  document.getElementById('sayingsHidden').value=cleaned.join('\n');
+  return true;
+}
 function pickNetwork(val){
   if(val){document.getElementById('ssid').value=val;}
 }
@@ -165,6 +260,10 @@ function pollClockTime(){
       setTimeout(pollClockTime,2000);
     });
 }
+renderSayings();
+var params=new URLSearchParams(window.location.search);
+var startTab=params.get('tab');
+if(startTab&&document.getElementById('panel-'+startTab)){switchTab(startTab);}
 loadScan(false);
 setTimeout(pollClockTime,1000);
 </script>
@@ -174,10 +273,12 @@ setTimeout(pollClockTime,1000);
 
 WifiClockface::WifiClockface(Adafruit_GFX *display,
                              RotationCallback onRotationChanged,
-                             PowerTimeoutCallback onPowerTimeoutsChanged)
+                             PowerTimeoutCallback onPowerTimeoutsChanged,
+                             DadSettingsCallback onDadSettingsChanged)
   : _display(display),
     _onRotationChanged(onRotationChanged),
-    _onPowerTimeoutsChanged(onPowerTimeoutsChanged)
+    _onPowerTimeoutsChanged(onPowerTimeoutsChanged),
+    _onDadSettingsChanged(onDadSettingsChanged)
 {
 }
 
@@ -215,6 +316,7 @@ void WifiClockface::setup(CWDateTime *dateTime)
   _server->on("/save", HTTP_POST, [this]() { handleSave(); });
   _server->on("/display", HTTP_POST, [this]() { handleDisplay(); });
   _server->on("/timezone", HTTP_POST, [this]() { handleTimeZone(); });
+  _server->on("/dad", HTTP_POST, [this]() { handleDad(); });
   _server->on("/time", HTTP_GET, [this]() { handleTime(); });
   _server->onNotFound([this]() { handleNotFound(); });
   _server->begin();
@@ -310,6 +412,29 @@ void WifiClockface::handleRoot()
   html.replace("__TZ_OPTIONS__", tzOptions);
   html.replace("__DST_CHECKED__", WifiConfig::loadDstEnabled() ? " checked" : "");
   html.replace("__CLOCK_TIME__", escapeHtml(formatClockTime()));
+
+  html.replace("__DAD_MENU__", escapeHtml(WifiConfig::loadDadMenuName()));
+  html.replace("__DAD_TOP__", escapeHtml(WifiConfig::loadDadTopText()));
+  html.replace("__DAD_BOT__", escapeHtml(WifiConfig::loadDadBottomText()));
+
+  auto buildSayingsJson = [](const std::vector<String> &items) {
+    String json = "[";
+    for (size_t i = 0; i < items.size(); ++i) {
+      if (i > 0) json += ",";
+      json += "\"";
+      json += escapeJson(items[i]);
+      json += "\"";
+    }
+    json += "]";
+    return json;
+  };
+
+  std::vector<String> dadSayings;
+  WifiConfig::loadDadSayings(dadSayings);
+  std::vector<String> dadDefaults;
+  WifiConfig::loadDefaultDadSayings(dadDefaults);
+  html.replace("__DAD_SAYINGS_JSON__", buildSayingsJson(dadSayings));
+  html.replace("__DAD_DEFAULT_SAYINGS_JSON__", buildSayingsJson(dadDefaults));
 
   _server->send(200, "text/html", html);
 }
@@ -502,6 +627,66 @@ bool WifiClockface::syncNtpWithCredentials(const String &ssid, const String &pas
   }
   WiFi.disconnect(false);
   return ntpSynced;
+}
+
+void WifiClockface::handleDad()
+{
+  String menuName = _server->hasArg("menuName") ? _server->arg("menuName") : "";
+  String topText  = _server->hasArg("topText")  ? _server->arg("topText")  : "";
+  String botText  = _server->hasArg("bottomText") ? _server->arg("bottomText") : "";
+  String rawSayings = _server->hasArg("sayings") ? _server->arg("sayings") : "";
+
+  menuName.trim();
+  if (menuName.length() == 0) {
+    menuName = WifiConfig::DEFAULT_DAD_MENU_NAME;
+  }
+
+  std::vector<String> sayings;
+  int start = 0;
+  while (start <= (int)rawSayings.length()) {
+    int nl = rawSayings.indexOf('\n', start);
+    String line = (nl < 0) ? rawSayings.substring(start) : rawSayings.substring(start, nl);
+    line.replace("\r", "");
+    line.trim();
+    if (line.length() > 0) {
+      sayings.push_back(line);
+    }
+    if (nl < 0) break;
+    start = nl + 1;
+  }
+
+  if (sayings.empty()) {
+    WifiConfig::loadDefaultDadSayings(sayings);
+  }
+
+  WifiConfig::saveDadMenuName(menuName);
+  WifiConfig::saveDadTopText(topText);
+  WifiConfig::saveDadBottomText(botText);
+  WifiConfig::saveDadSayings(sayings);
+
+  if (_onDadSettingsChanged) {
+    _onDadSettingsChanged();
+  }
+
+  _statusLine = "SAVED";
+  _statusColor = COLOR_GREEN;
+  _dirtyDisplay = true;
+
+  String page = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+                "<title>Dad Settings Saved</title>"
+                "<style>body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;display:flex;justify-content:center}"
+                ".card{max-width:420px;width:100%;background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px}"
+                "a{display:inline-block;margin-top:16px;padding:10px 14px;background:#0284c7;color:#fff;text-decoration:none;border-radius:8px}</style>"
+                "</head><body><div class='card'>"
+                "<h2 style='color:#4ade80;margin-top:0'>Dad Settings Saved!</h2>"
+                "<p>Menu Name: <strong>" + escapeHtml(WifiConfig::loadDadMenuName()) + "</strong></p>"
+                "<p>Top Text: <strong>" + escapeHtml(topText) + "</strong></p>"
+                "<p>Bottom Text: <strong>" + escapeHtml(botText) + "</strong></p>"
+                "<p>Sayings saved: <strong>" + String(sayings.size()) + "</strong></p>"
+                "<a href='/?tab=dad'>Back to Dad Settings</a></div></body></html>";
+
+  _server->send(200, "text/html", page);
 }
 
 void WifiClockface::handleTimeZone()

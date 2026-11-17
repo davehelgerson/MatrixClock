@@ -67,6 +67,10 @@ namespace {
     clockApp.setPowerTimeouts(dimMinutes, offMinutes);
   }
 
+  void onDadSettingsChanged() {
+    clockApp.refreshMenuLabels();
+  }
+
   void dispFlushThunk(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
     clockApp.flushDisplay(disp, area, color_p);
   }
@@ -170,6 +174,9 @@ void ClockApp::initTft()
 
   ui_init();
   lv_obj_set_style_anim_time(ui_Roller1, 120, LV_PART_MAIN);
+  String dadName = WifiConfig::loadDadMenuName();
+  String rollerOpts = "Mario\nPacman\nPackman 2\nPokedex\nMaple\n" + dadName + "\nStars\nPipes\nAnalog\nSettings";
+  lv_roller_set_options(ui_Roller1, rollerOpts.c_str(), LV_ROLLER_MODE_INFINITE);
 }
 
 void ClockApp::initMatrix()
@@ -195,7 +202,8 @@ void ClockApp::initClockfaces()
   _clockfaces[8] = new AnalogClockface(_dmaDisplay);                           // Analog
   _clockfaces[9] = new WifiClockface(_dmaDisplay,
                                      onRotationSettingChanged,
-                                     onPowerTimeoutsChanged);                // Settings
+                                     onPowerTimeoutsChanged,
+                                     onDadSettingsChanged);                // Settings
 
   _clockfaces[0]->setup(&_dateTime);
 }
@@ -217,6 +225,13 @@ void ClockApp::runTftTask()
       _rotationDirty = false;
       _gfx->setRotation(_tftRotation);
       lv_obj_invalidate(lv_scr_act());
+    }
+    if (_rollerOptionsDirty) {
+      _rollerOptionsDirty = false;
+      String dadName = WifiConfig::loadDadMenuName();
+      String rollerOpts = "Mario\nPacman\nPackman 2\nPokedex\nMaple\n" + dadName + "\nStars\nPipes\nAnalog\nSettings";
+      lv_roller_set_options(ui_Roller1, rollerOpts.c_str(), LV_ROLLER_MODE_INFINITE);
+      lv_roller_set_selected(ui_Roller1, _gifIndex, LV_ANIM_OFF);
     }
     updateUiWidgets();
     lv_timer_handler();
@@ -421,6 +436,11 @@ void ClockApp::setTftRotation(uint8_t rotation)
     _tftRotation = rotation;
     _rotationDirty = true;
   }
+}
+
+void ClockApp::refreshMenuLabels()
+{
+  _rollerOptionsDirty = true;
 }
 
 void ClockApp::setPowerTimeouts(uint16_t dimMinutes, uint16_t offMinutes)

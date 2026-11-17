@@ -2,6 +2,7 @@
 #define DadClockface_h
 
 #include <Adafruit_GFX.h>
+#include <vector>
 #include "../core/IClockface.h"
 #include "../core/CWDateTime.h"
 
@@ -9,7 +10,7 @@ class Clockface5: public IClockface {
   private:
     Adafruit_GFX* _display;
     CWDateTime* _dateTime;
-    int8_t _msgIndex;
+    int16_t _msgIndex;
     int16_t _scrollX;
     int16_t _msgWidth;
     uint16_t _msgColor;
@@ -18,6 +19,9 @@ class Clockface5: public IClockface {
     int8_t _lastHour;
     int8_t _lastMinute;
     bool _lastIsAM;
+    String _topText;
+    String _bottomText;
+    std::vector<String> _sayings;
 
     void pickNextMessage();
     void updateClock();

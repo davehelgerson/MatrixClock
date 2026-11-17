@@ -1,6 +1,7 @@
 #include "DadClockface.h"
 #include "ClockfaceCommon.h"
 #include "../core/Locator.h"
+#include "../core/WifiConfig.h"
 
 namespace {
   const uint16_t DAD_BG            = 0x0000;
@@ -15,27 +16,6 @@ namespace {
     0x5DFF  // Sky blue
   };
   const uint8_t DAD_COLOR_COUNT    = sizeof(DAD_COLORS) / sizeof(DAD_COLORS[0]);
-  const char* const DAD_MESSAGES[] = {
-    "I love you!",
-    "You are the best son!",
-    "You are amazing!",
-    "I love your creativity!",
-    "I'm proud of you!",
-    "You're my favorite human!",
-    "You are the son I always wanted!",
-    "You make me happy every day!",
-    "You're braver than you know!",
-    "I'm so happy that you are my son!",
-    "I'm here for you!",
-    "I'm lucky to be your dad!",
-    "I love adventures with you!",
-    "Your smile brightens my day!",
-    "Remember to always be kind!",
-    "I'm always cheering for you!",
-    "Thank you for being you!",
-    "You are courageous and strong!"
-  };
-  const uint8_t  DAD_MSG_COUNT     = sizeof(DAD_MESSAGES) / sizeof(DAD_MESSAGES[0]);
   const uint8_t  DAD_TEXT_SCALE    = 1;
   const int16_t  DAD_CHAR_W        = 6 * DAD_TEXT_SCALE;
   const int16_t  DAD_CHAR_H        = 8 * DAD_TEXT_SCALE;
@@ -58,6 +38,13 @@ void Clockface5::setup(CWDateTime *dateTime)
 {
   _dateTime = dateTime;
   randomSeed(esp_random());
+
+  _topText = WifiConfig::loadDadTopText();
+  _bottomText = WifiConfig::loadDadBottomText();
+  WifiConfig::loadDadSayings(_sayings);
+  if (_sayings.empty()) {
+    WifiConfig::loadDefaultDadSayings(_sayings);
+  }
 
   auto* d = Locator::getDisplay();
   d->fillRect(0, 0, 64, 64, DAD_BG);
@@ -84,20 +71,35 @@ void Clockface5::drawLabels()
 
   // Upper-left header in crisp 5x7 font
   d->setCursor(2, 2);
-  d->print("To Logan:");
+  d->print(_topText);
 
-  // Lower-right "- Dad" in crisp 5x7 font with tight 2px gap after dash
-  d->fillRect(39, 58, 4, 1, DAD_LABEL_COLOR);
-  d->setCursor(45, 55);
-  d->print("Dad");
+  // Lower-right footer in crisp 5x7 font
+  if (_bottomText == "- Dad") {
+    d->fillRect(39, 58, 4, 1, DAD_LABEL_COLOR);
+    d->setCursor(45, 55);
+    d->print("Dad");
+  } else {
+    int16_t footerX = 63 - (int16_t)_bottomText.length() * DAD_CHAR_W;
+    if (footerX < 33) footerX = 33;
+    d->setCursor(footerX, 55);
+    d->print(_bottomText);
+  }
 }
 
 void Clockface5::pickNextMessage()
 {
-  if (_msgIndex < 0) {
-    _msgIndex = random(DAD_MSG_COUNT);
+  int16_t msgCount = (int16_t)_sayings.size();
+  if (msgCount <= 0) {
+    _msgIndex = 0;
+    _msgWidth = 0;
+    _scrollX = 64;
+    return;
+  }
+
+  if (_msgIndex < 0 || _msgIndex >= msgCount || msgCount == 1) {
+    _msgIndex = random(msgCount);
   } else {
-    int8_t nextIdx = random(DAD_MSG_COUNT - 1);
+    int16_t nextIdx = random(msgCount - 1);
     if (nextIdx >= _msgIndex) {
       nextIdx++;
     }
@@ -109,7 +111,7 @@ void Clockface5::pickNextMessage()
     nextColorIdx = (nextColorIdx + 1) % DAD_COLOR_COUNT;
   }
   _msgColor = DAD_COLORS[nextColorIdx];
-  _msgWidth = (int16_t)strlen(DAD_MESSAGES[_msgIndex]) * DAD_CHAR_W;
+  _msgWidth = (int16_t)_sayings[_msgIndex].length() * DAD_CHAR_W;
   _scrollX = 64;
 }
 
@@ -162,8 +164,9 @@ void Clockface5::drawScrollingMessage()
   d->setTextWrap(false);
   d->setTextSize(1);
 
-  const char* msg = DAD_MESSAGES[_msgIndex];
-  size_t len = strlen(msg);
+  if (_sayings.empty() || _msgIndex < 0 || _msgIndex >= (int16_t)_sayings.size()) return;
+  const String &msg = _sayings[_msgIndex];
+  size_t len = msg.length();
 
   for (size_t i = 0; i < len; i++) {
     int16_t charX = _scrollX + (int16_t)i * DAD_CHAR_W;
