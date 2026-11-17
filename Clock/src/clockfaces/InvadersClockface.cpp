@@ -312,18 +312,28 @@ void InvadersClockface::updateShip()
 
   drawShip(_shipX, COLOR_BLACK);
 
-  // 1) Dodge any incoming bomb near ship level
+  // 1) Dodge any incoming bomb near ship level, and hold steady just outside its path until it passes
   int8_t desiredDir = 0;
+  bool holdingForBomb = false;
   int16_t shipCenter = _shipX + 3;
   for (int i = 0; i < MAX_BOMBS; i++) {
-    if (_bombs[i].active && _bombs[i].y >= 24 && abs(_bombs[i].x - shipCenter) <= 4) {
-      desiredDir = (_bombs[i].x >= shipCenter) ? -1 : 1;
-      break;
+    if (_bombs[i].active && _bombs[i].y >= 24) {
+      int16_t dx = abs(_bombs[i].x - shipCenter);
+      if (dx <= 5) {
+        if (_bombs[i].x >= shipCenter) {
+          desiredDir = (_shipX > 2) ? -1 : 1;
+        } else {
+          desiredDir = (_shipX < 64 - SHIP_W - 2) ? 1 : -1;
+        }
+        break;
+      } else if (dx <= 7) {
+        holdingForBomb = true;
+      }
     }
   }
 
-  // 2) Otherwise aim toward the nearest alive alien column
-  if (desiredDir == 0) {
+  // 2) Otherwise aim smoothly toward the nearest alive alien column
+  if (desiredDir == 0 && !holdingForBomb) {
     int16_t bestDist = 999;
     int16_t targetX = shipCenter;
     for (int c = 0; c < ALIEN_COLS; c++) {
@@ -341,8 +351,6 @@ void InvadersClockface::updateShip()
     }
     if (abs(targetX - shipCenter) > 1) {
       desiredDir = (targetX > shipCenter) ? 1 : -1;
-    } else {
-      desiredDir = (random(100) < 30) ? _shipDir : 0;
     }
   }
 

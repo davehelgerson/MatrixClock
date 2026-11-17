@@ -70,6 +70,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
   <button type="button" class="tab" data-tab="display" onclick="switchTab('display')">Display</button>
   <button type="button" class="tab" data-tab="time" onclick="switchTab('time')">Time</button>
   <button type="button" class="tab" data-tab="dad" onclick="switchTab('dad')">Dad</button>
+  <button type="button" class="tab" data-tab="faces" onclick="switchTab('faces')">Faces</button>
 </div>
 
 <div class="card panel active" id="panel-wifi">
@@ -162,6 +163,20 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     </div>
   </form>
 </div>
+
+<div class="card panel" id="panel-faces">
+  <h2>Menu Faces</h2>
+  <p class="sub">Choose which clock faces appear in the menu dial. Settings is always enabled.</p>
+  <form method="POST" action="/faces">
+    <div id="faceChecks" style="display:flex;flex-direction:column;gap:6px">
+      __FACE_CHECKBOXES__
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button type="button" class="btn btn-sec" onclick="toggleAllFaces(true)">Enable All</button>
+      <button type="submit" class="btn" style="margin-top:0">Save Menu Faces</button>
+    </div>
+  </form>
+</div>
 </div>
 <script>
 var dadSayings=__DAD_SAYINGS_JSON__;
@@ -213,6 +228,9 @@ function prepareDadForm(){
   var cleaned=dadSayings.map(function(s){return s.replace(/[\r\n]+/g,' ').trim();}).filter(function(s){return s.length>0;});
   document.getElementById('sayingsHidden').value=cleaned.join('\n');
   return true;
+}
+function toggleAllFaces(checked){
+  document.querySelectorAll('#faceChecks input[type="checkbox"]').forEach(function(cb){cb.checked=checked;});
 }
 function pickNetwork(val){
   if(val){document.getElementById('ssid').value=val;}
@@ -317,6 +335,7 @@ void WifiClockface::setup(CWDateTime *dateTime)
   _server->on("/display", HTTP_POST, [this]() { handleDisplay(); });
   _server->on("/timezone", HTTP_POST, [this]() { handleTimeZone(); });
   _server->on("/dad", HTTP_POST, [this]() { handleDad(); });
+  _server->on("/faces", HTTP_POST, [this]() { handleFaces(); });
   _server->on("/time", HTTP_GET, [this]() { handleTime(); });
   _server->onNotFound([this]() { handleNotFound(); });
   _server->begin();
@@ -435,6 +454,25 @@ void WifiClockface::handleRoot()
   WifiConfig::loadDefaultDadSayings(dadDefaults);
   html.replace("__DAD_SAYINGS_JSON__", buildSayingsJson(dadSayings));
   html.replace("__DAD_DEFAULT_SAYINGS_JSON__", buildSayingsJson(dadDefaults));
+
+  String dadName = WifiConfig::loadDadMenuName();
+  const char *faceLabels[12] = {
+    "Mario", "Pacman", "Packman 2", "Pokedex", "Maple", dadName.c_str(),
+    "Stars", "Pipes", "Analog", "Matrix", "Invaders", "Joke"
+  };
+  uint16_t faceMask = WifiConfig::loadEnabledFacesMask();
+  String faceCheckboxes;
+  for (int i = 0; i < 12; ++i) {
+    bool checked = WifiConfig::isFaceEnabled(faceMask, i, 12);
+    faceCheckboxes += "<label class='chk'><input type='checkbox' name='face_";
+    faceCheckboxes += String(i);
+    faceCheckboxes += "' value='1'";
+    if (checked) faceCheckboxes += " checked";
+    faceCheckboxes += "> ";
+    faceCheckboxes += escapeHtml(faceLabels[i]);
+    faceCheckboxes += "</label>";
+  }
+  html.replace("__FACE_CHECKBOXES__", faceCheckboxes);
 
   _server->send(200, "text/html", html);
 }
@@ -685,6 +723,41 @@ void WifiClockface::handleDad()
                 "<p>Bottom Text: <strong>" + escapeHtml(botText) + "</strong></p>"
                 "<p>Sayings saved: <strong>" + String(sayings.size()) + "</strong></p>"
                 "<a href='/?tab=dad'>Back to Dad Settings</a></div></body></html>";
+
+  _server->send(200, "text/html", page);
+}
+
+void WifiClockface::handleFaces()
+{
+  uint16_t mask = 0;
+  int enabledCount = 0;
+  for (int i = 0; i < 12; ++i) {
+    String argName = "face_" + String(i);
+    if (_server->hasArg(argName)) {
+      mask |= static_cast<uint16_t>(1U << i);
+      enabledCount++;
+    }
+  }
+
+  WifiConfig::saveEnabledFacesMask(mask, 12);
+  if (_onDadSettingsChanged) {
+    _onDadSettingsChanged();
+  }
+
+  _statusLine = "SAVED";
+  _statusColor = COLOR_GREEN;
+  _dirtyDisplay = true;
+
+  String page = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+                "<title>Menu Faces Saved</title>"
+                "<style>body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;display:flex;justify-content:center}"
+                ".card{max-width:420px;width:100%;background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px}"
+                "a{display:inline-block;margin-top:16px;padding:10px 14px;background:#0284c7;color:#fff;text-decoration:none;border-radius:8px}</style>"
+                "</head><body><div class='card'>"
+                "<h2 style='color:#4ade80;margin-top:0'>Menu Faces Saved!</h2>"
+                "<p>Enabled clock faces: <strong>" + String(enabledCount) + " of 12</strong> (+ Settings)</p>"
+                "<a href='/?tab=faces'>Back to Faces Settings</a></div></body></html>";
 
   _server->send(200, "text/html", page);
 }

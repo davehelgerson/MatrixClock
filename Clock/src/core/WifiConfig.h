@@ -56,6 +56,10 @@ class WifiConfig
     static int loadSelectedFace(int faceCount, int settingsIndex);
     static bool saveSelectedFace(int index);
 
+    static uint16_t loadEnabledFacesMask();
+    static bool saveEnabledFacesMask(uint16_t mask, int settingsIndex);
+    static bool isFaceEnabled(uint16_t mask, int index, int settingsIndex);
+
     static bool loadDailyJoke(String &dateOut, String &jokeOut);
     static bool saveDailyJoke(const String &date, const String &joke);
     static String getFallbackDailyJoke(int year, int month, int day);

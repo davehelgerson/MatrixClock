@@ -46,6 +46,7 @@ class WifiClockface : public IClockface {
     void handleDisplay();
     void handleTimeZone();
     void handleDad();
+    void handleFaces();
     void handleTime();
     void handleNotFound();
 

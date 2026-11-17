@@ -175,10 +175,7 @@ void ClockApp::initTft()
   ui_init();
   lv_obj_set_style_anim_time(ui_Roller1, 120, LV_PART_MAIN);
   _gifIndex = WifiConfig::loadSelectedFace(CLOCKFACE_COUNT, SETTINGS_FACE_INDEX);
-  String dadName = WifiConfig::loadDadMenuName();
-  String rollerOpts = "Mario\nPacman\nPackman 2\nPokedex\nMaple\n" + dadName + "\nStars\nPipes\nAnalog\nMatrix\nInvaders\nJoke\nSettings";
-  lv_roller_set_options(ui_Roller1, rollerOpts.c_str(), LV_ROLLER_MODE_INFINITE);
-  lv_roller_set_selected(ui_Roller1, _gifIndex, LV_ANIM_OFF);
+  rebuildVisibleMenu(true);
 }
 
 void ClockApp::initMatrix()
@@ -234,10 +231,7 @@ void ClockApp::runTftTask()
     }
     if (_rollerOptionsDirty) {
       _rollerOptionsDirty = false;
-      String dadName = WifiConfig::loadDadMenuName();
-      String rollerOpts = "Mario\nPacman\nPackman 2\nPokedex\nMaple\n" + dadName + "\nStars\nPipes\nAnalog\nMatrix\nInvaders\nJoke\nSettings";
-      lv_roller_set_options(ui_Roller1, rollerOpts.c_str(), LV_ROLLER_MODE_INFINITE);
-      lv_roller_set_selected(ui_Roller1, _gifIndex, LV_ANIM_OFF);
+      rebuildVisibleMenu(false);
     }
     updateUiWidgets();
     lv_timer_handler();
@@ -348,9 +342,12 @@ void ClockApp::handleEncoder()
   _lastActivityMillis = millis();
 
   if (page_index == 0) {
-    int nextIndex = ((_gifIndex + delta) % CLOCKFACE_COUNT + CLOCKFACE_COUNT) % CLOCKFACE_COUNT;
-    _gifIndex = nextIndex;
-    Serial.printf("enc delta=%d -> gif_num=%d\n", delta, nextIndex);
+    if (_visibleCount > 0) {
+      int curPos = rollerPositionForFace(_gifIndex);
+      int nextPos = ((curPos + delta) % _visibleCount + _visibleCount) % _visibleCount;
+      _gifIndex = _visibleFaces[nextPos];
+      Serial.printf("enc delta=%d -> gif_num=%d (pos=%d)\n", delta, _gifIndex, nextPos);
+    }
   } else if (page_index == 1) {
     int nextBrightness = constrain(_brightness + delta, 0, 100);
     _brightness = nextBrightness;
@@ -402,16 +399,18 @@ void ClockApp::updateUiWidgets()
   int curBrightness = _brightness;
 
   if (curPage == 0) {
+    int targetPos = rollerPositionForFace(curGif);
+    int lastPos = (lastGif >= 0) ? rollerPositionForFace(lastGif) : -1;
     bool needsSync = (curPage != lastPage) || (curGif != lastGif) ||
-                     (static_cast<int>(lv_roller_get_selected(ui_Roller1)) != curGif);
+                     (static_cast<int>(lv_roller_get_selected(ui_Roller1)) != targetPos);
     if (needsSync) {
-      if (curPage == lastPage && lastGif >= 0 && curGif != lastGif) {
+      if (curPage == lastPage && lastPos >= 0 && targetPos != lastPos) {
         // Re-center the infinite roller on its middle page before starting a new
         // animation so rapid turns cannot drift into LVGL's edge-page clamp/underflow.
-        lv_roller_set_selected(ui_Roller1, lastGif, LV_ANIM_OFF);
+        lv_roller_set_selected(ui_Roller1, lastPos, LV_ANIM_OFF);
       }
       lv_anim_enable_t anim = (curPage != lastPage) ? LV_ANIM_OFF : LV_ANIM_ON;
-      lv_roller_set_selected(ui_Roller1, curGif, anim);
+      lv_roller_set_selected(ui_Roller1, targetPos, anim);
       lastGif = curGif;
       lastPage = curPage;
     }
@@ -450,6 +449,51 @@ void ClockApp::setTftRotation(uint8_t rotation)
 void ClockApp::refreshMenuLabels()
 {
   _rollerOptionsDirty = true;
+}
+
+int ClockApp::rollerPositionForFace(int faceIndex) const
+{
+  for (int i = 0; i < _visibleCount; ++i) {
+    if (_visibleFaces[i] == faceIndex) {
+      return i;
+    }
+  }
+  return 0;
+}
+
+void ClockApp::rebuildVisibleMenu(bool animateOff)
+{
+  (void)animateOff;
+  String dadName = WifiConfig::loadDadMenuName();
+  const char *labels[CLOCKFACE_COUNT] = {
+    "Mario", "Pacman", "Packman 2", "Pokedex", "Maple", dadName.c_str(),
+    "Stars", "Pipes", "Analog", "Matrix", "Invaders", "Joke", "Settings"
+  };
+
+  uint16_t mask = WifiConfig::loadEnabledFacesMask();
+  String rollerOpts;
+  _visibleCount = 0;
+
+  for (int i = 0; i < CLOCKFACE_COUNT; ++i) {
+    if (WifiConfig::isFaceEnabled(mask, i, SETTINGS_FACE_INDEX)) {
+      if (_visibleCount > 0) rollerOpts += "\n";
+      rollerOpts += labels[i];
+      _visibleFaces[_visibleCount++] = i;
+    }
+  }
+
+  if (_visibleCount == 0) {
+    rollerOpts = "Settings";
+    _visibleFaces[0] = SETTINGS_FACE_INDEX;
+    _visibleCount = 1;
+  }
+
+  if (!WifiConfig::isFaceEnabled(mask, _gifIndex, SETTINGS_FACE_INDEX)) {
+    _gifIndex = _visibleFaces[0];
+  }
+
+  lv_roller_set_options(ui_Roller1, rollerOpts.c_str(), LV_ROLLER_MODE_INFINITE);
+  lv_roller_set_selected(ui_Roller1, rollerPositionForFace(_gifIndex), LV_ANIM_OFF);
 }
 
 void ClockApp::setPowerTimeouts(uint16_t dimMinutes, uint16_t offMinutes)

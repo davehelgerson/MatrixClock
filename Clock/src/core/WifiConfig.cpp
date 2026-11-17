@@ -41,6 +41,7 @@ const char *KEY_OFF_MIN    = "off_min";
 const char *KEY_TZ_INDEX   = "tz_idx";
 const char *KEY_DST        = "dst";
 const char *KEY_FACE_IDX   = "face_idx";
+const char *KEY_FACE_MASK  = "face_mask";
 const char *KEY_JOKE_DATE  = "joke_dt";
 const char *KEY_JOKE_TEXT  = "joke_txt";
 
@@ -415,6 +416,42 @@ bool WifiConfig::saveSelectedFace(int index)
   size_t w = prefs.putInt(KEY_FACE_IDX, index);
   prefs.end();
   return w > 0;
+}
+
+uint16_t WifiConfig::loadEnabledFacesMask()
+{
+  Preferences prefs;
+  if (!prefs.begin(PREF_NAMESPACE, true)) {
+    return 0xFFFF;
+  }
+  uint16_t mask = prefs.getUShort(KEY_FACE_MASK, 0xFFFF);
+  prefs.end();
+  return mask;
+}
+
+bool WifiConfig::saveEnabledFacesMask(uint16_t mask, int settingsIndex)
+{
+  if (settingsIndex >= 0 && settingsIndex < 16) {
+    mask |= static_cast<uint16_t>(1U << settingsIndex);
+  }
+  Preferences prefs;
+  if (!prefs.begin(PREF_NAMESPACE, false)) {
+    return false;
+  }
+  size_t w = prefs.putUShort(KEY_FACE_MASK, mask);
+  prefs.end();
+  return w > 0;
+}
+
+bool WifiConfig::isFaceEnabled(uint16_t mask, int index, int settingsIndex)
+{
+  if (index == settingsIndex) {
+    return true;
+  }
+  if (index < 0 || index >= 16) {
+    return false;
+  }
+  return (mask & (1U << index)) != 0;
 }
 
 bool WifiConfig::loadDailyJoke(String &dateOut, String &jokeOut)

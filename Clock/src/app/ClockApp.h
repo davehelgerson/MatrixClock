@@ -38,6 +38,8 @@ class ClockApp {
 
     CWDateTime _dateTime;
     IClockface *_clockfaces[CLOCKFACE_COUNT] = {nullptr};
+    int _visibleFaces[CLOCKFACE_COUNT] = {0};
+    int _visibleCount = 0;
 
     lv_disp_draw_buf_t _drawBuf;
     lv_color_t _buf[TFT_WIDTH * TFT_HEIGHT / 10];
@@ -77,6 +79,8 @@ class ClockApp {
     void handlePowerState();
     void updateUiWidgets();
     void requestMatrixBrightness(int percent);
+    void rebuildVisibleMenu(bool animateOff);
+    int rollerPositionForFace(int faceIndex) const;
 };
 
 extern ClockApp clockApp;
