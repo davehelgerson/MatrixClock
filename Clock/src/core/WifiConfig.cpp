@@ -1,5 +1,8 @@
 #include "WifiConfig.h"
 #include <Preferences.h>
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 
 namespace {
 const char *PREF_NAMESPACE = "wifi";
@@ -37,6 +40,9 @@ const char *KEY_DIM_MIN    = "dim_min";
 const char *KEY_OFF_MIN    = "off_min";
 const char *KEY_TZ_INDEX   = "tz_idx";
 const char *KEY_DST        = "dst";
+const char *KEY_FACE_IDX   = "face_idx";
+const char *KEY_JOKE_DATE  = "joke_dt";
+const char *KEY_JOKE_TEXT  = "joke_txt";
 
 struct TimeZoneOption {
   const char *label;
@@ -383,5 +389,187 @@ bool WifiConfig::saveDadSayings(const std::vector<String> &sayings)
     prefs.putString(KEY_DAD_SAY, joined);
   }
   prefs.end();
+  return true;
+}
+
+int WifiConfig::loadSelectedFace(int faceCount, int settingsIndex)
+{
+  Preferences prefs;
+  if (!prefs.begin(PREF_NAMESPACE, true)) {
+    return 0;
+  }
+  int idx = prefs.getInt(KEY_FACE_IDX, 0);
+  prefs.end();
+  if (idx < 0 || idx >= faceCount || idx == settingsIndex) {
+    return 0;
+  }
+  return idx;
+}
+
+bool WifiConfig::saveSelectedFace(int index)
+{
+  Preferences prefs;
+  if (!prefs.begin(PREF_NAMESPACE, false)) {
+    return false;
+  }
+  size_t w = prefs.putInt(KEY_FACE_IDX, index);
+  prefs.end();
+  return w > 0;
+}
+
+bool WifiConfig::loadDailyJoke(String &dateOut, String &jokeOut)
+{
+  dateOut = "";
+  jokeOut = "";
+  Preferences prefs;
+  if (!prefs.begin(PREF_NAMESPACE, true)) {
+    return false;
+  }
+  dateOut = prefs.getString(KEY_JOKE_DATE, "");
+  jokeOut = prefs.getString(KEY_JOKE_TEXT, "");
+  prefs.end();
+  return dateOut.length() > 0 && jokeOut.length() > 0;
+}
+
+bool WifiConfig::saveDailyJoke(const String &date, const String &joke)
+{
+  if (date.length() == 0 || joke.length() == 0) {
+    return false;
+  }
+  Preferences prefs;
+  if (!prefs.begin(PREF_NAMESPACE, false)) {
+    return false;
+  }
+  prefs.putString(KEY_JOKE_DATE, date);
+  prefs.putString(KEY_JOKE_TEXT, joke);
+  prefs.end();
+  return true;
+}
+
+String WifiConfig::getFallbackDailyJoke(int year, int month, int day)
+{
+  static const char *const KID_JOKES[] = {
+    "Why did the math book look sad? Because it had too many problems!",
+    "What do you call a bear with no teeth? A gummy bear!",
+    "Why couldn't the bicycle stand up by itself? It was two-tired!",
+    "What do you call a sleeping dinosaur? A dino-snore!",
+    "Why did the golfer bring two pairs of pants? In case he got a hole in one!",
+    "What do you call a fake noodle? An impasta!",
+    "Why did the banana go to the doctor? Because it wasn't peeling well!",
+    "What kind of tree fits in your hand? A palm tree!",
+    "Why did the cookie go to the nurse? Because it felt crummy!",
+    "What do you call a cow with no legs? Ground beef!",
+    "Why are fish so smart? Because they live in schools!",
+    "What did one ocean say to the other? Nothing, they just waved!",
+    "Why did the picture go to jail? Because it was framed!",
+    "What has keys that open no locks? A piano!",
+    "Why did the robot go on vacation? To recharge its batteries!",
+    "What do you call cheese that isn't yours? Nacho cheese!",
+    "Why did the scarecrow win an award? He was outstanding in his field!",
+    "What kind of room has no doors or windows? A mushroom!",
+    "Why can't you give Elsa a balloon? Because she will let it go!",
+    "What do you call a boomerang that won't come back? A stick!"
+  };
+  constexpr size_t COUNT = sizeof(KID_JOKES) / sizeof(KID_JOKES[0]);
+  uint32_t seed = (uint32_t)(year * 372 + month * 31 + day);
+  return String(KID_JOKES[seed % COUNT]);
+}
+
+namespace {
+String extractJsonStringField(const String &json, const char *key)
+{
+  String pattern = String("\"") + key + "\"";
+  int idx = json.indexOf(pattern);
+  if (idx < 0) return "";
+  int colon = json.indexOf(':', idx + pattern.length());
+  if (colon < 0) return "";
+  int startQuote = json.indexOf('"', colon + 1);
+  if (startQuote < 0) return "";
+
+  String out;
+  bool escaped = false;
+  for (int i = startQuote + 1; i < (int)json.length(); ++i) {
+    char c = json[i];
+    if (escaped) {
+      if (c == 'n' || c == 'r') out += ' ';
+      else if (c == 't') out += ' ';
+      else out += c;
+      escaped = false;
+    } else if (c == '\\') {
+      escaped = true;
+    } else if (c == '"') {
+      return out;
+    } else {
+      out += c;
+    }
+  }
+  return "";
+}
+}  // namespace
+
+bool WifiConfig::fetchDailyJokeIfNeeded(int year, int month, int day, bool connectWifiIfNeeded)
+{
+  char dateBuf[16];
+  snprintf(dateBuf, sizeof(dateBuf), "%04d-%02d-%02d", year, month, day);
+  String today(dateBuf);
+
+  String cachedDate, cachedJoke;
+  if (loadDailyJoke(cachedDate, cachedJoke) && cachedDate == today) {
+    return true;
+  }
+
+  bool weStartedWifi = false;
+  if (WiFi.status() != WL_CONNECTED && connectWifiIfNeeded) {
+    String ssid, pass;
+    if (load(ssid, pass)) {
+      WiFi.persistent(false);
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(ssid.c_str(), pass.c_str());
+      unsigned long start = millis();
+      while (WiFi.status() != WL_CONNECTED && (millis() - start) < 10000UL) {
+        delay(250);
+      }
+      weStartedWifi = true;
+    }
+  }
+
+  String fetchedJoke;
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient http;
+    http.setTimeout(5000);
+    if (http.begin(client, "https://v2.jokeapi.dev/joke/Pun,Misc?blacklistFlags=nsfw,religious,political,racist,sexist,explicit&safe-mode")) {
+      int code = http.GET();
+      if (code == HTTP_CODE_OK) {
+        String payload = http.getString();
+        String single = extractJsonStringField(payload, "joke");
+        if (single.length() > 0) {
+          fetchedJoke = single;
+        } else {
+          String setup = extractJsonStringField(payload, "setup");
+          String delivery = extractJsonStringField(payload, "delivery");
+          if (setup.length() > 0 && delivery.length() > 0) {
+            fetchedJoke = setup + "  " + delivery;
+          }
+        }
+      }
+      http.end();
+    }
+  }
+
+  if (weStartedWifi) {
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+  }
+
+  if (fetchedJoke.length() == 0) {
+    fetchedJoke = getFallbackDailyJoke(year, month, day);
+  }
+
+  fetchedJoke.replace("\n", " ");
+  fetchedJoke.replace("\r", "");
+  fetchedJoke.trim();
+  saveDailyJoke(today, fetchedJoke);
   return true;
 }

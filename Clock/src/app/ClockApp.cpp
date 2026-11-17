@@ -16,7 +16,7 @@ int page_index = 0;
 ClockApp clockApp;
 
 namespace {
-  const int SETTINGS_FACE_INDEX = 6;
+  const int SETTINGS_FACE_INDEX = 12;
 
   enum EncoderState : uint8_t {
     ENC_START     = 0,
@@ -174,9 +174,11 @@ void ClockApp::initTft()
 
   ui_init();
   lv_obj_set_style_anim_time(ui_Roller1, 120, LV_PART_MAIN);
+  _gifIndex = WifiConfig::loadSelectedFace(CLOCKFACE_COUNT, SETTINGS_FACE_INDEX);
   String dadName = WifiConfig::loadDadMenuName();
-  String rollerOpts = "Mario\nPacman\nPackman 2\nPokedex\nMaple\n" + dadName + "\nStars\nPipes\nAnalog\nSettings";
+  String rollerOpts = "Mario\nPacman\nPackman 2\nPokedex\nMaple\n" + dadName + "\nStars\nPipes\nAnalog\nMatrix\nInvaders\nJoke\nSettings";
   lv_roller_set_options(ui_Roller1, rollerOpts.c_str(), LV_ROLLER_MODE_INFINITE);
+  lv_roller_set_selected(ui_Roller1, _gifIndex, LV_ANIM_OFF);
 }
 
 void ClockApp::initMatrix()
@@ -200,12 +202,16 @@ void ClockApp::initClockfaces()
   _clockfaces[6] = new StarsClockface(_dmaDisplay);                            // Stars
   _clockfaces[7] = new PipesClockface(_dmaDisplay);                            // Pipes
   _clockfaces[8] = new AnalogClockface(_dmaDisplay);                           // Analog
-  _clockfaces[9] = new WifiClockface(_dmaDisplay,
-                                     onRotationSettingChanged,
-                                     onPowerTimeoutsChanged,
-                                     onDadSettingsChanged);                // Settings
+  _clockfaces[9] = new MatrixRainClockface(_dmaDisplay);                       // Matrix
+  _clockfaces[10] = new InvadersClockface(_dmaDisplay);                        // Invaders
+  _clockfaces[11] = new JokeClockface(_dmaDisplay);                            // Joke
+  _clockfaces[12] = new WifiClockface(_dmaDisplay,
+                                      onRotationSettingChanged,
+                                      onPowerTimeoutsChanged,
+                                      onDadSettingsChanged);                // Settings
 
-  _clockfaces[0]->setup(&_dateTime);
+  int startIdx = (_gifIndex >= 0 && _gifIndex < CLOCKFACE_COUNT) ? _gifIndex : 0;
+  _clockfaces[startIdx]->setup(&_dateTime);
 }
 
 void ClockApp::runTftTask()
@@ -229,7 +235,7 @@ void ClockApp::runTftTask()
     if (_rollerOptionsDirty) {
       _rollerOptionsDirty = false;
       String dadName = WifiConfig::loadDadMenuName();
-      String rollerOpts = "Mario\nPacman\nPackman 2\nPokedex\nMaple\n" + dadName + "\nStars\nPipes\nAnalog\nSettings";
+      String rollerOpts = "Mario\nPacman\nPackman 2\nPokedex\nMaple\n" + dadName + "\nStars\nPipes\nAnalog\nMatrix\nInvaders\nJoke\nSettings";
       lv_roller_set_options(ui_Roller1, rollerOpts.c_str(), LV_ROLLER_MODE_INFINITE);
       lv_roller_set_selected(ui_Roller1, _gifIndex, LV_ANIM_OFF);
     }
@@ -250,7 +256,7 @@ void ClockApp::runControlTask()
 
 void ClockApp::runTimeTask()
 {
-  int activeIndex = 0;
+  int activeIndex = _gifIndex;
   while (1) {
     int targetIndex = _gifIndex;
     if (targetIndex != activeIndex) {
@@ -270,6 +276,9 @@ void ClockApp::runTimeTask()
         _clockfaces[activeIndex]->teardown();
         activeIndex = targetIndex;
         _clockfaces[activeIndex]->setup(&_dateTime);
+        if (activeIndex != SETTINGS_FACE_INDEX) {
+          WifiConfig::saveSelectedFace(activeIndex);
+        }
       }
     }
 

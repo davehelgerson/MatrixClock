@@ -110,6 +110,8 @@ void CWDateTime::begin()
     if (WiFi.status() == WL_CONNECTED) {
       Serial.println(" connected");
       syncTimeNtp();
+      DateTime cur = now();
+      WifiConfig::fetchDailyJokeIfNeeded(cur.year(), cur.month(), cur.day(), false);
     } else {
       Serial.println(" WiFi timeout, using existing RTC time");
     }
@@ -199,6 +201,11 @@ int CWDateTime::getDay()
 int CWDateTime::getMonth()
 {
   return now().month();
+}
+
+int CWDateTime::getYear()
+{
+  return now().year();
 }
 
 void CWDateTime::formatDateTime(char *buf, size_t len)

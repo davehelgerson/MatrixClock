@@ -33,6 +33,7 @@ class CWDateTime
 
     int getDay();
     int getMonth();
+    int getYear();
 };
 
 #endif

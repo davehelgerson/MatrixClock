@@ -52,6 +52,14 @@ class WifiConfig
     static void loadDefaultDadSayings(std::vector<String> &out);
     static void loadDadSayings(std::vector<String> &out);
     static bool saveDadSayings(const std::vector<String> &sayings);
+
+    static int loadSelectedFace(int faceCount, int settingsIndex);
+    static bool saveSelectedFace(int index);
+
+    static bool loadDailyJoke(String &dateOut, String &jokeOut);
+    static bool saveDailyJoke(const String &date, const String &joke);
+    static String getFallbackDailyJoke(int year, int month, int day);
+    static bool fetchDailyJokeIfNeeded(int year, int month, int day, bool connectWifiIfNeeded);
 };
 
 #endif

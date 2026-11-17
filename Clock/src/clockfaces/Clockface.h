@@ -10,6 +10,9 @@
 #include "StarsClockface.h"
 #include "PipesClockface.h"
 #include "AnalogClockface.h"
+#include "MatrixRainClockface.h"
+#include "InvadersClockface.h"
+#include "JokeClockface.h"
 #include "WifiClockface.h"
 
 #endif
