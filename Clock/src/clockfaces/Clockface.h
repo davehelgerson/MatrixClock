@@ -8,6 +8,7 @@
 #include "MapleClockface.h"
 #include "DadClockface.h"
 #include "StarsClockface.h"
+#include "PipesClockface.h"
 #include "WifiClockface.h"
 
 #endif
