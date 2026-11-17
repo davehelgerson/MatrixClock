@@ -86,19 +86,33 @@ void Clockface2::drawMap()
 
 void Clockface2::updateClock()
 {
-  Locator::getDisplay()->fillRect(14, 19, 36, 26, 0x0000);
+  auto* display = Locator::getDisplay();
+  display->drawRect(12, 17, 40, 30, 0x0016);
+  display->drawRect(13, 18, 38, 28, 0x0016);
+  display->fillRect(14, 19, 36, 26, 0x0000);
 
-  Locator::getDisplay()->setTextSize(1);
-  Locator::getDisplay()->setFont(&Picopixel);
-  Locator::getDisplay()->setTextColor(0xAD55);
-  Locator::getDisplay()->setCursor(15, 41);
-  Locator::getDisplay()->print(monthName(_dateTime->getMonth()));
-  Locator::getDisplay()->print(" ");
-  Locator::getDisplay()->print(_dateTime->getDay());
-  Locator::getDisplay()->print(" ");
-  Locator::getDisplay()->print(weekDayName(_dateTime->getWeekday()));
+  display->setTextSize(1);
+  display->setFont(&Picopixel);
+  display->setTextColor(0xAD55);
 
-  drawCompactClockTime(Locator::getDisplay(), _dateTime->getHour(), _dateTime->getMinute(), 15, 27, 0xFE40, 2);
+  char dateBuf[12];
+  snprintf(dateBuf, sizeof(dateBuf), "%s %d",
+           monthName(_dateTime->getMonth()),
+           _dateTime->getDay());
+
+  int16_t x1, y1;
+  uint16_t w, h;
+  display->getTextBounds(dateBuf, 0, 36, &x1, &y1, &w, &h);
+  display->setCursor(32 - (w / 2) - x1, 36);
+  display->print(dateBuf);
+
+  display->setTextColor(0xFE40);
+  const char* dayStr = weekDayName(_dateTime->getWeekday());
+  display->getTextBounds(dayStr, 0, 43, &x1, &y1, &w, &h);
+  display->setCursor(32 - (w / 2) - x1, 43);
+  display->print(dayStr);
+
+  drawCompactClockTime(display, _dateTime->getHour(), _dateTime->getMinute(), 15, 20, 0xFE40, 2);
 }
 
 Clockface2::MapBlock Clockface2::nextBlock()
@@ -133,8 +147,7 @@ Clockface2::MapBlock Clockface2::nextBlock(Direction dir)
 
 const char* Clockface2::weekDayName(int weekday)
 {
-  strncpy(weekDayTemp, _weekDayWords + (weekday * 3), 3);
-  return weekDayTemp;
+  return (weekday >= 0 && weekday < 7) ? _weekDayNames[weekday] : "";
 }
 
 const char* Clockface2::monthName(int month)
