@@ -133,6 +133,10 @@ void Pacman::changePacmanColor(uint16_t newcolor) {
 
 }
 
+void Pacman::setPosition(int x, int y) {
+  _x = x;
+  _y = y;
+}
 int Pacman::getX() {
   return this->_x;
 }

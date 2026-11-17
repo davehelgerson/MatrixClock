@@ -4,6 +4,7 @@
 #include "MarioClockface.h"
 #include "PokedexClockface.h"
 #include "PacmanClockface.h"
+#include "Pacman2Clockface.h"
 #include "MapleClockface.h"
 #include "DadClockface.h"
 #include "StarsClockface.h"

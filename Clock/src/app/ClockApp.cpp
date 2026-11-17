@@ -186,11 +186,12 @@ void ClockApp::initClockfaces()
 {
   _clockfaces[0] = new Clockface3(_dmaDisplay);     // Mario
   _clockfaces[1] = new Clockface2(_dmaDisplay);     // Pacman
-  _clockfaces[2] = new Clockface1(_dmaDisplay);     // Pokedex
-  _clockfaces[3] = new Clockface4(_dmaDisplay);     // Maple
-  _clockfaces[4] = new Clockface5(_dmaDisplay);                                // Dad
-  _clockfaces[5] = new StarsClockface(_dmaDisplay);                            // Stars
-  _clockfaces[6] = new WifiClockface(_dmaDisplay,
+  _clockfaces[2] = new Pacman2Clockface(_dmaDisplay); // Packman 2
+  _clockfaces[3] = new Clockface1(_dmaDisplay);     // Pokedex
+  _clockfaces[4] = new Clockface4(_dmaDisplay);     // Maple
+  _clockfaces[5] = new Clockface5(_dmaDisplay);                                // Dad
+  _clockfaces[6] = new StarsClockface(_dmaDisplay);                            // Stars
+  _clockfaces[7] = new WifiClockface(_dmaDisplay,
                                      onRotationSettingChanged,
                                      onPowerTimeoutsChanged);                // Settings
 

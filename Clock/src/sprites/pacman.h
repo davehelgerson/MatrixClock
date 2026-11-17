@@ -59,6 +59,7 @@ class Pacman: public Sprite, public EventTask {
     void turn(Direction dir);
     void setState(State state);
     int nextBlock();
+    void setPosition(int x, int y);
     int getX();
     int getY();
     void update();

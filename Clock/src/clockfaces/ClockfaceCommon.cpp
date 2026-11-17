@@ -58,12 +58,14 @@ void drawCompactClockDigit(Adafruit_GFX* display, uint8_t digit, int16_t x, int1
   }
 }
 
-void drawCompactClockTime(Adafruit_GFX* display, uint8_t hour, uint8_t minute, int16_t x, int16_t y, uint16_t color, uint8_t scale)
+void drawCompactClockTime(Adafruit_GFX* display, uint8_t hour, uint8_t minute, int16_t x, int16_t y, uint16_t color, uint8_t scale, bool showColon)
 {
   drawCompactClockDigit(display, hour / 10, x, y, color, scale);
   drawCompactClockDigit(display, hour % 10, x + (4 * scale), y, color, scale);
-  display->fillRect(x + (8 * scale), y + scale, scale, scale, color);
-  display->fillRect(x + (8 * scale), y + (3 * scale), scale, scale, color);
+  if (showColon) {
+    display->fillRect(x + (8 * scale), y + scale, scale, scale, color);
+    display->fillRect(x + (8 * scale), y + (3 * scale), scale, scale, color);
+  }
   drawCompactClockDigit(display, minute / 10, x + (10 * scale), y, color, scale);
   drawCompactClockDigit(display, minute % 10, x + (14 * scale), y, color, scale);
 }
