@@ -192,7 +192,8 @@ void ClockApp::initClockfaces()
   _clockfaces[5] = new Clockface5(_dmaDisplay);                                // Dad
   _clockfaces[6] = new StarsClockface(_dmaDisplay);                            // Stars
   _clockfaces[7] = new PipesClockface(_dmaDisplay);                            // Pipes
-  _clockfaces[8] = new WifiClockface(_dmaDisplay,
+  _clockfaces[8] = new AnalogClockface(_dmaDisplay);                           // Analog
+  _clockfaces[9] = new WifiClockface(_dmaDisplay,
                                      onRotationSettingChanged,
                                      onPowerTimeoutsChanged);                // Settings
 

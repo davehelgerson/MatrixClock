@@ -9,6 +9,7 @@
 #include "DadClockface.h"
 #include "StarsClockface.h"
 #include "PipesClockface.h"
+#include "AnalogClockface.h"
 #include "WifiClockface.h"
 
 #endif
