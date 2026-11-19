@@ -204,6 +204,7 @@ void ClockApp::initClockfaces()
   _clockfaces[FACE_INVADERS]  = new InvadersClockface(_dmaDisplay);
   _clockfaces[FACE_JOKE]      = new JokeClockface(_dmaDisplay);
   _clockfaces[FACE_HOURGLASS] = new HourglassClockface(_dmaDisplay);
+  _clockfaces[FACE_AQUARIUM]  = new AquariumClockface(_dmaDisplay);
   _clockfaces[FACE_SETTINGS]  = new WifiClockface(_dmaDisplay,
                                                   onRotationSettingChanged,
                                                   onPowerTimeoutsChanged,

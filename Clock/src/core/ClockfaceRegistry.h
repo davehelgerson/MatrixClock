@@ -23,8 +23,9 @@ enum FaceIndex : int {
   FACE_INVADERS  = 10,
   FACE_JOKE      = 11,
   FACE_HOURGLASS = 12,
-  FACE_SETTINGS  = 13,
-  COUNT          = 14
+  FACE_AQUARIUM  = 13,
+  FACE_SETTINGS  = 14,
+  COUNT          = 15
 };
 
 static constexpr int MESSAGES_INDEX   = FACE_MESSAGES;
@@ -50,6 +51,7 @@ inline const char *defaultLabel(int index)
     "Invaders",
     "Joke",
     "Hourglass",
+    "Aquarium",
     "Settings"
   };
   return (index >= 0 && index < COUNT) ? LABELS[index] : "";

@@ -49,6 +49,7 @@ Built specifically for the **[Makerfabs MaTouch 1.28" Toolset with RGB LED Matri
 | **Invaders** | Autonomous Space Invaders arcade battle with an accelerating alien fleet, destructible bunkers, AI ship dodging/shooting, mystery UFO, and bottom time bar. |
 | **Joke** | Daily kid-friendly joke scroller fetched over WiFi (with non-blocking background fetch and offline fallback jokes) plus a lower-left clock. |
 | **Hourglass** | Three graduated hourglasses (widest **Day**, medium **Hour**, slimmest **Minute**) with grain-conserving sand physics, falling sand streams, and lower-left `HH:MM AM/PM` time. |
+| **Aquarium** | Animated fish tank with a dim deep-blue water gradient, sandy bottom, swaying seaweed, a treasure chest that opens on the minute releasing bubbles, 5 boids schooling fish (1 larger, 4 smaller), scheduled cameos (crab & jellyfish every 2 min, manta ray every 10 min, shark every 20 min, yellow submarine on the hour), and lower-left white time. |
 | **Settings** | Launches the `MatrixClock-Setup` WiFi AP and captive-portal web server for device configuration. |
 
 ---
@@ -85,7 +86,7 @@ Clock/
   Clock.ino                  # Entry point (delegates to ClockApp FreeRTOS tasks)
   src/
     app/                     # ClockApp (FreeRTOS tasks, encoder, power state, LVGL glue)
-    clockfaces/              # All 14 clock face implementations + shared drawing helpers
+    clockfaces/              # All 15 clock face implementations + shared drawing helpers
     core/                    # ClockfaceRegistry, CWDateTime, WifiConfig (NVS/NTP), EventBus
     hardware/                # Pin configuration, shared I2C mutex, CST816S touch driver
     fonts/ & sprites/        # Bitmap fonts and pixel-art sprites

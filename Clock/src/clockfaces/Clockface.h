@@ -14,6 +14,7 @@
 #include "InvadersClockface.h"
 #include "JokeClockface.h"
 #include "HourglassClockface.h"
+#include "AquariumClockface.h"
 #include "WifiClockface.h"
 
 #endif
