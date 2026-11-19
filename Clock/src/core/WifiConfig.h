@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <vector>
+#include "ClockfaceRegistry.h"
 
 /**
  * Persists and retrieves home WiFi credentials and device display settings
@@ -23,8 +24,8 @@ class WifiConfig
     static constexpr const char *DEFAULT_DAD_TOP_TEXT  = "To Logan:";
     static constexpr const char *DEFAULT_DAD_BOT_TEXT  = "- Dad";
 
-    static constexpr int JOKE_FACE_INDEX     = 11;
-    static constexpr int SETTINGS_FACE_INDEX = 13;
+    static constexpr int JOKE_FACE_INDEX     = ClockfaceRegistry::JOKE_INDEX;
+    static constexpr int SETTINGS_FACE_INDEX = ClockfaceRegistry::SETTINGS_INDEX;
 
     static uint16_t normalizeTimeoutMinutes(uint16_t minutes);
 
@@ -59,9 +60,9 @@ class WifiConfig
     static int loadSelectedFace(int faceCount, int settingsIndex);
     static bool saveSelectedFace(int index);
 
-    static uint16_t loadEnabledFacesMask();
-    static bool saveEnabledFacesMask(uint16_t mask, int settingsIndex);
-    static bool isFaceEnabled(uint16_t mask, int index, int settingsIndex);
+    static uint32_t loadEnabledFacesMask();
+    static bool saveEnabledFacesMask(uint32_t mask, int settingsIndex);
+    static bool isFaceEnabled(uint32_t mask, int index, int settingsIndex);
 
     static bool loadDailyJoke(String &dateOut, String &jokeOut);
     static bool saveDailyJoke(const String &date, const String &joke);

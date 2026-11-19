@@ -11,7 +11,7 @@ static_assert(ENCODER_CLK >= 32 && ENCODER_DT >= 32,
               "Encoder pins must map to GPIO_IN1_REG");
 
 // Referenced by LVGL SquareLine events in lib/ui/src/ui_events.c
-int page_index = 0;
+volatile int page_index = 0;
 
 ClockApp clockApp;
 
@@ -112,7 +112,7 @@ void ClockApp::begin()
   _dateTime.begin();
   initClockfaces();
 
-  _lastActivityMillis = millis();
+  __atomic_store_n(&_lastActivityMillis, millis(), __ATOMIC_RELEASE);
   Serial.println("Setup done");
 
   xTaskCreatePinnedToCore(tftTaskThunk, "Task_TFT", 10240, nullptr, 2, nullptr, 0);
@@ -190,23 +190,24 @@ void ClockApp::initMatrix()
 
 void ClockApp::initClockfaces()
 {
-  _clockfaces[0] = new Clockface3(_dmaDisplay);     // Mario
-  _clockfaces[1] = new Clockface2(_dmaDisplay);     // Pacman
-  _clockfaces[2] = new Pacman2Clockface(_dmaDisplay); // Packman 2
-  _clockfaces[3] = new Clockface1(_dmaDisplay);     // Pokedex
-  _clockfaces[4] = new Clockface4(_dmaDisplay);     // Maple
-  _clockfaces[5] = new Clockface5(_dmaDisplay);                                // Dad
-  _clockfaces[6] = new StarsClockface(_dmaDisplay);                            // Stars
-  _clockfaces[7] = new PipesClockface(_dmaDisplay);                            // Pipes
-  _clockfaces[8] = new AnalogClockface(_dmaDisplay);                           // Analog
-  _clockfaces[9] = new MatrixRainClockface(_dmaDisplay);                       // Matrix
-  _clockfaces[10] = new InvadersClockface(_dmaDisplay);                        // Invaders
-  _clockfaces[11] = new JokeClockface(_dmaDisplay);                            // Joke
-  _clockfaces[12] = new HourglassClockface(_dmaDisplay);                       // Hourglass
-  _clockfaces[13] = new WifiClockface(_dmaDisplay,
-                                      onRotationSettingChanged,
-                                      onPowerTimeoutsChanged,
-                                      onDadSettingsChanged);                // Settings
+  using namespace ClockfaceRegistry;
+  _clockfaces[FACE_MARIO]     = new Clockface3(_dmaDisplay);
+  _clockfaces[FACE_PACMAN]    = new Clockface2(_dmaDisplay);
+  _clockfaces[FACE_PACMAN2]   = new Pacman2Clockface(_dmaDisplay);
+  _clockfaces[FACE_POKEDEX]   = new Clockface1(_dmaDisplay);
+  _clockfaces[FACE_MAPLE]     = new Clockface4(_dmaDisplay);
+  _clockfaces[FACE_DAD]       = new Clockface5(_dmaDisplay);
+  _clockfaces[FACE_STARS]     = new StarsClockface(_dmaDisplay);
+  _clockfaces[FACE_PIPES]     = new PipesClockface(_dmaDisplay);
+  _clockfaces[FACE_ANALOG]    = new AnalogClockface(_dmaDisplay);
+  _clockfaces[FACE_MATRIX]    = new MatrixRainClockface(_dmaDisplay);
+  _clockfaces[FACE_INVADERS]  = new InvadersClockface(_dmaDisplay);
+  _clockfaces[FACE_JOKE]      = new JokeClockface(_dmaDisplay);
+  _clockfaces[FACE_HOURGLASS] = new HourglassClockface(_dmaDisplay);
+  _clockfaces[FACE_SETTINGS]  = new WifiClockface(_dmaDisplay,
+                                                  onRotationSettingChanged,
+                                                  onPowerTimeoutsChanged,
+                                                  onDadSettingsChanged);
 
   int startIdx = (_gifIndex >= 0 && _gifIndex < CLOCKFACE_COUNT) ? _gifIndex : 0;
   _clockfaces[startIdx]->setup(&_dateTime);
@@ -314,15 +315,17 @@ void ClockApp::pollEncoder()
   _encoderState = ENCODER_NEXT_STATE[state][rawAb];
 
   if (step != 0) {
+    bool sleeping = __atomic_load_n(&_screenSleeping, __ATOMIC_ACQUIRE);
+    bool dimmed   = __atomic_load_n(&_screenDimmed, __ATOMIC_ACQUIRE);
     portENTER_CRITICAL(&_encoderMux);
-    if (_screenSleeping) {
+    if (sleeping) {
       // Both displays are dark: the first detent only wakes them, so the user
       // doesn't change clockface/brightness without seeing it happen.
-      _wakeRequested = true;
+      __atomic_store_n(&_wakeRequested, true, __ATOMIC_RELEASE);
     } else {
       _encoderDelta += step;
-      if (_screenDimmed) {
-        _wakeRequested = true;
+      if (dimmed) {
+        __atomic_store_n(&_wakeRequested, true, __ATOMIC_RELEASE);
       }
     }
     portEXIT_CRITICAL(&_encoderMux);
@@ -340,7 +343,7 @@ void ClockApp::handleEncoder()
     return;
   }
 
-  _lastActivityMillis = millis();
+  __atomic_store_n(&_lastActivityMillis, millis(), __ATOMIC_RELEASE);
 
   if (page_index == 0) {
     portENTER_CRITICAL(&_menuMux);
@@ -365,29 +368,30 @@ void ClockApp::requestMatrixBrightness(int percent)
 
 void ClockApp::handlePowerState()
 {
-  uint16_t dimMin = WifiConfig::normalizeTimeoutMinutes(_dimMinutes);
-  uint16_t offMin = WifiConfig::normalizeTimeoutMinutes(_offMinutes);
-  unsigned long idleTime = millis() - _lastActivityMillis;
+  uint16_t dimMin = WifiConfig::normalizeTimeoutMinutes(__atomic_load_n(&_dimMinutes, __ATOMIC_ACQUIRE));
+  uint16_t offMin = WifiConfig::normalizeTimeoutMinutes(__atomic_load_n(&_offMinutes, __ATOMIC_ACQUIRE));
+  unsigned long idleTime = millis() - __atomic_load_n(&_lastActivityMillis, __ATOMIC_ACQUIRE);
+  bool sleeping = __atomic_load_n(&_screenSleeping, __ATOMIC_ACQUIRE);
+  bool dimmed   = __atomic_load_n(&_screenDimmed, __ATOMIC_ACQUIRE);
 
-  if (!_screenSleeping &&
+  if (!sleeping &&
       idleTime >= static_cast<unsigned long>(offMin) * 60000UL) {
-    _screenSleeping = true;
-    _screenDimmed = false;
+    __atomic_store_n(&_screenSleeping, true, __ATOMIC_RELEASE);
+    __atomic_store_n(&_screenDimmed, false, __ATOMIC_RELEASE);
     _tftOnRequested = false;
     _matrixBrightnessRequested = 0;
-  } else if (!_screenSleeping && !_screenDimmed &&
+  } else if (!sleeping && !dimmed &&
              idleTime >= static_cast<unsigned long>(dimMin) * 60000UL && _brightness > 5) {
-    _screenDimmed = true;
+    __atomic_store_n(&_screenDimmed, true, __ATOMIC_RELEASE);
     requestMatrixBrightness(5);
   }
 
-  if (_wakeRequested) {
+  if (__atomic_exchange_n(&_wakeRequested, false, __ATOMIC_ACQ_REL)) {
     _tftOnRequested = true;
     requestMatrixBrightness(_brightness);
-    _lastActivityMillis = millis();
-    _wakeRequested = false;
-    _screenSleeping = false;
-    _screenDimmed = false;
+    __atomic_store_n(&_lastActivityMillis, millis(), __ATOMIC_RELEASE);
+    __atomic_store_n(&_screenSleeping, false, __ATOMIC_RELEASE);
+    __atomic_store_n(&_screenDimmed, false, __ATOMIC_RELEASE);
   }
 }
 
@@ -470,12 +474,8 @@ void ClockApp::rebuildVisibleMenu(bool animateOff)
 {
   (void)animateOff;
   String dadName = WifiConfig::loadDadMenuName();
-  const char *labels[CLOCKFACE_COUNT] = {
-    "Mario", "Pacman", "Packman 2", "Pokedex", "Maple", dadName.c_str(),
-    "Stars", "Pipes", "Analog", "Matrix", "Invaders", "Joke", "Hourglass", "Settings"
-  };
 
-  uint16_t mask = WifiConfig::loadEnabledFacesMask();
+  uint32_t mask = WifiConfig::loadEnabledFacesMask();
   String rollerOpts;
   int nextFaces[CLOCKFACE_COUNT] = {0};
   int nextCount = 0;
@@ -483,13 +483,16 @@ void ClockApp::rebuildVisibleMenu(bool animateOff)
   for (int i = 0; i < CLOCKFACE_COUNT; ++i) {
     if (WifiConfig::isFaceEnabled(mask, i, SETTINGS_FACE_INDEX)) {
       if (nextCount > 0) rollerOpts += "\n";
-      rollerOpts += labels[i];
+      const char *label = (i == ClockfaceRegistry::DAD_INDEX)
+                          ? dadName.c_str()
+                          : ClockfaceRegistry::defaultLabel(i);
+      rollerOpts += label;
       nextFaces[nextCount++] = i;
     }
   }
 
   if (nextCount == 0) {
-    rollerOpts = "Settings";
+    rollerOpts = ClockfaceRegistry::defaultLabel(SETTINGS_FACE_INDEX);
     nextFaces[0] = SETTINGS_FACE_INDEX;
     nextCount = 1;
   }
@@ -511,11 +514,12 @@ void ClockApp::rebuildVisibleMenu(bool animateOff)
 
 void ClockApp::setPowerTimeouts(uint16_t dimMinutes, uint16_t offMinutes)
 {
-  _dimMinutes = WifiConfig::normalizeTimeoutMinutes(dimMinutes);
-  _offMinutes = WifiConfig::normalizeTimeoutMinutes(offMinutes);
-  _lastActivityMillis = millis();
-  if (_screenSleeping || _screenDimmed) {
-    _wakeRequested = true;
+  __atomic_store_n(&_dimMinutes, WifiConfig::normalizeTimeoutMinutes(dimMinutes), __ATOMIC_RELEASE);
+  __atomic_store_n(&_offMinutes, WifiConfig::normalizeTimeoutMinutes(offMinutes), __ATOMIC_RELEASE);
+  __atomic_store_n(&_lastActivityMillis, millis(), __ATOMIC_RELEASE);
+  if (__atomic_load_n(&_screenSleeping, __ATOMIC_ACQUIRE) ||
+      __atomic_load_n(&_screenDimmed, __ATOMIC_ACQUIRE)) {
+    __atomic_store_n(&_wakeRequested, true, __ATOMIC_RELEASE);
   }
 }
 
@@ -530,12 +534,12 @@ void ClockApp::readTouchpad(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
   }
 
   // Any touch counts as user activity so the idle dim/off timers restart.
-  _lastActivityMillis = millis();
+  __atomic_store_n(&_lastActivityMillis, millis(), __ATOMIC_RELEASE);
 
-  if (_screenSleeping || _touchSuppressed) {
+  if (__atomic_load_n(&_screenSleeping, __ATOMIC_ACQUIRE) || _touchSuppressed) {
     // A tap on the dark screen only wakes it; swallow the press until the
     // finger lifts so it can't trigger whatever widget is under it.
-    _wakeRequested = true;
+    __atomic_store_n(&_wakeRequested, true, __ATOMIC_RELEASE);
     _touchSuppressed = true;
     data->state = LV_INDEV_STATE_REL;
     return;
@@ -562,8 +566,8 @@ void ClockApp::readTouchpad(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
       break;
   }
 
-  if (_screenDimmed) {
-    _wakeRequested = true;
+  if (__atomic_load_n(&_screenDimmed, __ATOMIC_ACQUIRE)) {
+    __atomic_store_n(&_wakeRequested, true, __ATOMIC_RELEASE);
   }
 }
 

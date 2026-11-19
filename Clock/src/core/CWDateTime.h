@@ -5,10 +5,23 @@
 #include <RTClib.h>
 #include <time.h>
 
+struct TimeSnapshot
+{
+  int year;
+  int month;
+  int day;
+  int hour;
+  int minute;
+  int second;
+  int weekday;
+  bool isAM;
+};
+
 class CWDateTime
 {
   private:
     RTC_PCF8563 rtc;
+    portMUX_TYPE _cacheMux = portMUX_INITIALIZER_UNLOCKED;
     uint32_t _cachedUnixTime = 0;
     unsigned long _lastSyncMillis = 0;
 
@@ -20,6 +33,7 @@ class CWDateTime
     bool syncTimeNtp();
     bool applyTimeZone();
     void formatDateTime(char *buf, size_t len);
+    TimeSnapshot snapshot();
 
     char *getHour(const char *format);
     char *getMinute(const char *format);

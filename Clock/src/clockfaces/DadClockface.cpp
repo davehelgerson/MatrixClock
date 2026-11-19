@@ -119,9 +119,10 @@ void Clockface5::updateClock()
 {
   if (!_dateTime) return;
 
-  int h24 = _dateTime->getHour();
-  int minute = _dateTime->getMinute();
-  bool am = _dateTime->isAM();
+  TimeSnapshot snap = _dateTime->snapshot();
+  int h24 = snap.hour;
+  int minute = snap.minute;
+  bool am = snap.isAM;
   int h12 = h24 % 12;
   if (h12 == 0) h12 = 12;
 

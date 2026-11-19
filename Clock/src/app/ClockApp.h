@@ -8,6 +8,7 @@
 #include <lvgl.h>
 #include "../core/CWDateTime.h"
 #include "../core/IClockface.h"
+#include "../core/ClockfaceRegistry.h"
 
 class ClockApp {
   public:
@@ -30,7 +31,7 @@ class ClockApp {
     static const uint8_t  PANEL_RES_X = 64;
     static const uint8_t  PANEL_RES_Y = 64;
     static const uint8_t  PANEL_CHAIN = 1;
-    static const int     CLOCKFACE_COUNT = 14;
+    static const int     CLOCKFACE_COUNT = ClockfaceRegistry::COUNT;
 
     Arduino_ESP32SPI *_bus = nullptr;
     Arduino_GFX *_gfx = nullptr;

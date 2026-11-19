@@ -132,7 +132,8 @@ void HourglassClockface::setup(CWDateTime *dateTime)
   }
 
   if (_dateTime) {
-    drawTime(_dateTime->getHour(), _dateTime->getMinute(), _dateTime->isAM(), true);
+    TimeSnapshot snap = _dateTime->snapshot();
+    drawTime(snap.hour, snap.minute, snap.isAM, true);
   }
   update();
 }
@@ -289,10 +290,11 @@ void HourglassClockface::update()
   _lastFrameMillis = now;
   ++_animTick;
 
-  int hour   = _dateTime->getHour();
-  int minute = _dateTime->getMinute();
-  int second = _dateTime->getSecond();
-  bool isAM  = _dateTime->isAM();
+  TimeSnapshot snap = _dateTime->snapshot();
+  int hour   = snap.hour;
+  int minute = snap.minute;
+  int second = snap.second;
+  bool isAM  = snap.isAM;
 
   if (second != _lastSecond) {
     _lastSecond = second;

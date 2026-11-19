@@ -40,9 +40,11 @@ const char *KEY_DIM_MIN    = "dim_min";
 const char *KEY_OFF_MIN    = "off_min";
 const char *KEY_TZ_INDEX   = "tz_idx";
 const char *KEY_DST        = "dst";
-const char *KEY_FACE_IDX   = "face_idx";
-const char *KEY_FACE_MASK  = "face_mask";
-const char *KEY_JOKE_DATE  = "joke_dt";
+const char *KEY_FACE_IDX    = "face_idx";
+const char *KEY_FACE_MASK   = "face_mask";
+const char *KEY_FACE_MASK32 = "face_m32";
+const char *KEY_FACE_CNT    = "face_cnt";
+const char *KEY_JOKE_DATE   = "joke_dt";
 const char *KEY_JOKE_TEXT  = "joke_txt";
 
 struct TimeZoneOption {
@@ -418,40 +420,75 @@ bool WifiConfig::saveSelectedFace(int index)
   return w > 0;
 }
 
-uint16_t WifiConfig::loadEnabledFacesMask()
+uint32_t WifiConfig::loadEnabledFacesMask()
 {
   Preferences prefs;
   if (!prefs.begin(PREF_NAMESPACE, true)) {
-    return 0xFFFF;
+    return 0xFFFFFFFFUL;
   }
-  uint16_t mask = prefs.getUShort(KEY_FACE_MASK, 0xFFFF);
+
+  uint32_t mask = 0xFFFFFFFFUL;
+  if (prefs.isKey(KEY_FACE_MASK32)) {
+    mask = prefs.getUInt(KEY_FACE_MASK32, 0xFFFFFFFFUL);
+    if (prefs.isKey(KEY_FACE_CNT)) {
+      uint8_t savedCount = prefs.getUChar(KEY_FACE_CNT, 32);
+      if (savedCount < 32) {
+        mask |= (0xFFFFFFFFUL << savedCount);
+      }
+    }
+  } else if (prefs.isKey(KEY_FACE_MASK)) {
+    // Migrate legacy 16-bit mask while preserving previously disabled faces
+    // and defaulting any newly added faces to enabled.
+    uint16_t legacyMask = prefs.getUShort(KEY_FACE_MASK, 0xFFFF);
+    mask = static_cast<uint32_t>(legacyMask) | 0xFFFF0000UL;
+    if (prefs.isKey(KEY_FACE_CNT)) {
+      uint8_t savedCount = prefs.getUChar(KEY_FACE_CNT, 16);
+      if (savedCount < 32) {
+        mask |= (0xFFFFFFFFUL << savedCount);
+      }
+    } else {
+      int topBit = -1;
+      for (int b = 15; b >= 0; --b) {
+        if ((legacyMask & (1U << b)) != 0) {
+          topBit = b;
+          break;
+        }
+      }
+      if (topBit >= 0 && topBit < 32) {
+        mask |= (0xFFFFFFFFUL << topBit);
+      }
+    }
+  }
   prefs.end();
   return mask;
 }
 
-bool WifiConfig::saveEnabledFacesMask(uint16_t mask, int settingsIndex)
+bool WifiConfig::saveEnabledFacesMask(uint32_t mask, int settingsIndex)
 {
-  if (settingsIndex >= 0 && settingsIndex < 16) {
-    mask |= static_cast<uint16_t>(1U << settingsIndex);
+  if (settingsIndex >= 0 && settingsIndex < 32) {
+    mask |= (0xFFFFFFFFUL << settingsIndex);
   }
   Preferences prefs;
   if (!prefs.begin(PREF_NAMESPACE, false)) {
     return false;
   }
-  size_t w = prefs.putUShort(KEY_FACE_MASK, mask);
+  size_t w = prefs.putUInt(KEY_FACE_MASK32, mask);
+  if (settingsIndex >= 0 && settingsIndex < 32) {
+    prefs.putUChar(KEY_FACE_CNT, static_cast<uint8_t>(settingsIndex));
+  }
   prefs.end();
   return w > 0;
 }
 
-bool WifiConfig::isFaceEnabled(uint16_t mask, int index, int settingsIndex)
+bool WifiConfig::isFaceEnabled(uint32_t mask, int index, int settingsIndex)
 {
   if (index == settingsIndex) {
     return true;
   }
-  if (index < 0 || index >= 16) {
+  if (index < 0 || index >= 32) {
     return false;
   }
-  return (mask & (1U << index)) != 0;
+  return (mask & (1UL << index)) != 0;
 }
 
 bool WifiConfig::loadDailyJoke(String &dateOut, String &jokeOut)

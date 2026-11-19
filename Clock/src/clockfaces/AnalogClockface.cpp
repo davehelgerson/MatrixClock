@@ -125,13 +125,13 @@ void AnalogClockface::update()
 {
   if (!_display || !_dateTime) return;
 
-  int sec = _dateTime->getSecond();
-  if (sec == _lastSecond) {
+  TimeSnapshot snap = _dateTime->snapshot();
+  if (snap.second == _lastSecond) {
     return;
   }
-  _lastSecond = sec;
+  _lastSecond = snap.second;
 
   erasePrevHands();
   drawDial();
-  drawHands(_dateTime->getHour(), _dateTime->getMinute(), sec);
+  drawHands(snap.hour, snap.minute, snap.second);
 }

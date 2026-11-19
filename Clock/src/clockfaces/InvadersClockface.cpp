@@ -480,14 +480,15 @@ void InvadersClockface::updateClockBar()
 {
   if (!_dateTime || !_display) return;
 
-  int minute = _dateTime->getMinute();
+  TimeSnapshot snap = _dateTime->snapshot();
+  int minute = snap.minute;
   if (minute == _lastMinute) return;
   _lastMinute = minute;
 
   _display->fillRect(0, 51, 64, 13, COLOR_BLACK);
 
-  int h24 = _dateTime->getHour();
-  bool am = _dateTime->isAM();
+  int h24 = snap.hour;
+  bool am = snap.isAM;
   int h12 = h24 % 12;
   if (h12 == 0) h12 = 12;
 

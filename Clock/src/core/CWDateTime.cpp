@@ -33,8 +33,10 @@ bool CWDateTime::updateRtcFromTm(const struct tm &timeinfo, const char *logMsg)
     rtc.adjust(synced);
   }
 
+  portENTER_CRITICAL(&_cacheMux);
   _cachedUnixTime = synced.unixtime();
   _lastSyncMillis = millis();
+  portEXIT_CRITICAL(&_cacheMux);
   if (logMsg) {
     Serial.println(logMsg);
   }
@@ -129,8 +131,10 @@ void CWDateTime::begin()
   {
     I2CBus::Guard guard;
     DateTime current = rtc.now();
+    portENTER_CRITICAL(&_cacheMux);
     _cachedUnixTime = current.unixtime();
     _lastSyncMillis = millis();
+    portEXIT_CRITICAL(&_cacheMux);
     Serial.println("RTC ready");
     Serial.println(current.timestamp());
   }
@@ -138,17 +142,41 @@ void CWDateTime::begin()
 
 DateTime CWDateTime::now()
 {
-  unsigned long elapsed = millis() - _lastSyncMillis;
-  if (_cachedUnixTime == 0 || elapsed >= RTC_RESYNC_INTERVAL_MS) {
+  uint32_t cachedUnix = 0;
+  unsigned long lastSync = 0;
+  portENTER_CRITICAL(&_cacheMux);
+  cachedUnix = _cachedUnixTime;
+  lastSync = _lastSyncMillis;
+  portEXIT_CRITICAL(&_cacheMux);
+
+  unsigned long elapsed = millis() - lastSync;
+  if (cachedUnix == 0 || elapsed >= RTC_RESYNC_INTERVAL_MS) {
     I2CBus::Guard guard;
     if (guard.locked()) {
       DateTime hw = rtc.now();
+      portENTER_CRITICAL(&_cacheMux);
       _cachedUnixTime = hw.unixtime();
       _lastSyncMillis = millis();
+      portEXIT_CRITICAL(&_cacheMux);
       return hw;
     }
   }
-  return DateTime(_cachedUnixTime + (uint32_t)(elapsed / 1000UL));
+  return DateTime(cachedUnix + (uint32_t)(elapsed / 1000UL));
+}
+
+TimeSnapshot CWDateTime::snapshot()
+{
+  DateTime dt = now();
+  TimeSnapshot snap;
+  snap.year    = dt.year();
+  snap.month   = dt.month();
+  snap.day     = dt.day();
+  snap.hour    = dt.hour();
+  snap.minute  = dt.minute();
+  snap.second  = dt.second();
+  snap.weekday = dt.dayOfTheWeek();
+  snap.isAM    = (snap.hour < 12);
+  return snap;
 }
 
 char *CWDateTime::getHour(const char *format)

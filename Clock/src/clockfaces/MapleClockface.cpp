@@ -40,14 +40,15 @@ void Clockface4::updateClock()
 {
   auto* d = Locator::getDisplay();
 
-  int h24 = _dateTime->getHour();
+  TimeSnapshot snap = _dateTime->snapshot();
+  int h24 = snap.hour;
   int h12 = h24 % 12;
   if (h12 == 0) h12 = 12;
-  bool am = _dateTime->isAM();
+  bool am = snap.isAM;
 
   d->fillRect(7, 4, 52, 23, MAPLE_BG);
 
-  drawCompactClockTime(d, h12, _dateTime->getMinute(), 7, 4, MAPLE_TIME, 3);
+  drawCompactClockTime(d, h12, snap.minute, 7, 4, MAPLE_TIME, 3);
   if (h12 < 10) {
     d->fillRect(7, 4, 12, 15, MAPLE_BG);
   }

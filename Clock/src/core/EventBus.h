@@ -13,6 +13,7 @@ class EventBus {
   public:
     void broadcast(EventType event, Sprite* sender);
     void subscribe(EventTask* task);
+    void unsubscribe(EventTask* task);
     
 };
 

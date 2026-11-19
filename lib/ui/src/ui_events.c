@@ -5,7 +5,7 @@
 
 #include "ui.h"
 
-extern int page_index;
+extern volatile int page_index;
 extern int sd_update_flag;
 
 void change_page_2(lv_event_t * e)

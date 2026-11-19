@@ -21,5 +21,16 @@ void EventBus::subscribe(EventTask* task) {
   } else {
     Serial.println("Out of space");
   }
+}
 
+void EventBus::unsubscribe(EventTask* task) {
+  for (uint8_t i = 0; i < _subNum; i++) {
+    if (_subscriptions[i] == task) {
+      for (uint8_t j = i; j + 1 < _subNum; j++) {
+        _subscriptions[j] = _subscriptions[j + 1];
+      }
+      _subNum--;
+      return;
+    }
+  }
 }

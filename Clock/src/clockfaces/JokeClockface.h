@@ -31,10 +31,11 @@ class JokeClockface : public IClockface {
 
     unsigned long _lastScrollMillis = 0;
     unsigned long _lastClockMillis = 0;
+    uint32_t _seenFetchGeneration = 0;
 
-    void loadOrFetchTodaysJoke();
+    void loadOrFetchTodaysJoke(const TimeSnapshot &snap, bool allowBackgroundFetch);
     void drawHeader();
-    void updateClock();
+    void updateClock(const TimeSnapshot &snap);
     void drawScrollingJoke();
 
   public:

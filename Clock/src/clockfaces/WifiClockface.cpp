@@ -456,20 +456,19 @@ void WifiClockface::handleRoot()
   html.replace("__DAD_DEFAULT_SAYINGS_JSON__", buildSayingsJson(dadDefaults));
 
   String dadName = WifiConfig::loadDadMenuName();
-  const char *faceLabels[13] = {
-    "Mario", "Pacman", "Packman 2", "Pokedex", "Maple", dadName.c_str(),
-    "Stars", "Pipes", "Analog", "Matrix", "Invaders", "Joke", "Hourglass"
-  };
-  uint16_t faceMask = WifiConfig::loadEnabledFacesMask();
+  uint32_t faceMask = WifiConfig::loadEnabledFacesMask();
   String faceCheckboxes;
-  for (int i = 0; i < 13; ++i) {
+  for (int i = 0; i < ClockfaceRegistry::SELECTABLE_COUNT; ++i) {
     bool checked = WifiConfig::isFaceEnabled(faceMask, i, WifiConfig::SETTINGS_FACE_INDEX);
+    const char *label = (i == ClockfaceRegistry::DAD_INDEX)
+                        ? dadName.c_str()
+                        : ClockfaceRegistry::defaultLabel(i);
     faceCheckboxes += "<label class='chk'><input type='checkbox' name='face_";
     faceCheckboxes += String(i);
     faceCheckboxes += "' value='1'";
     if (checked) faceCheckboxes += " checked";
     faceCheckboxes += "> ";
-    faceCheckboxes += escapeHtml(faceLabels[i]);
+    faceCheckboxes += escapeHtml(label);
     faceCheckboxes += "</label>";
   }
   html.replace("__FACE_CHECKBOXES__", faceCheckboxes);
@@ -733,12 +732,12 @@ void WifiClockface::handleDad()
 
 void WifiClockface::handleFaces()
 {
-  uint16_t mask = 0;
+  uint32_t mask = 0;
   int enabledCount = 0;
-  for (int i = 0; i < 13; ++i) {
+  for (int i = 0; i < ClockfaceRegistry::SELECTABLE_COUNT; ++i) {
     String argName = "face_" + String(i);
     if (_server->hasArg(argName)) {
-      mask |= static_cast<uint16_t>(1U << i);
+      mask |= (1UL << i);
       enabledCount++;
     }
   }
@@ -760,7 +759,7 @@ void WifiClockface::handleFaces()
                 "a{display:inline-block;margin-top:16px;padding:10px 14px;background:#0284c7;color:#fff;text-decoration:none;border-radius:8px}</style>"
                 "</head><body><div class='card'>"
                 "<h2 style='color:#4ade80;margin-top:0'>Menu Faces Saved!</h2>"
-                "<p>Enabled clock faces: <strong>" + String(enabledCount) + " of 13</strong> (+ Settings)</p>"
+                "<p>Enabled clock faces: <strong>" + String(enabledCount) + " of " + String(ClockfaceRegistry::SELECTABLE_COUNT) + "</strong> (+ Settings)</p>"
                 "<a href='/?tab=faces'>Back to Faces Settings</a></div></body></html>";
 
   _server->send(200, "text/html", page);
