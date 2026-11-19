@@ -13,6 +13,7 @@
 #include "MatrixRainClockface.h"
 #include "InvadersClockface.h"
 #include "JokeClockface.h"
+#include "HourglassClockface.h"
 #include "WifiClockface.h"
 
 #endif

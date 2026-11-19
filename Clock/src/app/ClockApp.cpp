@@ -202,7 +202,8 @@ void ClockApp::initClockfaces()
   _clockfaces[9] = new MatrixRainClockface(_dmaDisplay);                       // Matrix
   _clockfaces[10] = new InvadersClockface(_dmaDisplay);                        // Invaders
   _clockfaces[11] = new JokeClockface(_dmaDisplay);                            // Joke
-  _clockfaces[12] = new WifiClockface(_dmaDisplay,
+  _clockfaces[12] = new HourglassClockface(_dmaDisplay);                       // Hourglass
+  _clockfaces[13] = new WifiClockface(_dmaDisplay,
                                       onRotationSettingChanged,
                                       onPowerTimeoutsChanged,
                                       onDadSettingsChanged);                // Settings
@@ -471,7 +472,7 @@ void ClockApp::rebuildVisibleMenu(bool animateOff)
   String dadName = WifiConfig::loadDadMenuName();
   const char *labels[CLOCKFACE_COUNT] = {
     "Mario", "Pacman", "Packman 2", "Pokedex", "Maple", dadName.c_str(),
-    "Stars", "Pipes", "Analog", "Matrix", "Invaders", "Joke", "Settings"
+    "Stars", "Pipes", "Analog", "Matrix", "Invaders", "Joke", "Hourglass", "Settings"
   };
 
   uint16_t mask = WifiConfig::loadEnabledFacesMask();
