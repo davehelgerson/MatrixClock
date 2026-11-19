@@ -69,7 +69,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
   <button type="button" class="tab active" data-tab="wifi" onclick="switchTab('wifi')">WiFi</button>
   <button type="button" class="tab" data-tab="display" onclick="switchTab('display')">Display</button>
   <button type="button" class="tab" data-tab="time" onclick="switchTab('time')">Time</button>
-  <button type="button" class="tab" data-tab="dad" onclick="switchTab('dad')">Dad</button>
+  <button type="button" class="tab" data-tab="messages" onclick="switchTab('messages')">Messages</button>
   <button type="button" class="tab" data-tab="faces" onclick="switchTab('faces')">Faces</button>
 </div>
 
@@ -134,18 +134,18 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
   </form>
 </div>
 
-<div class="card panel" id="panel-dad">
-  <h2>Dad Clock Face</h2>
+<div class="card panel" id="panel-messages">
+  <h2>Messages Clock Face</h2>
   <p class="sub">Customize the menu name, header/footer text, and scrolling sayings.</p>
-  <form method="POST" action="/dad" onsubmit="return prepareDadForm()">
-    <label for="dadMenu">Menu Name</label>
-    <input id="dadMenu" name="menuName" type="text" required maxlength="24" value="__DAD_MENU__" placeholder="Dad">
+  <form method="POST" action="/messages" onsubmit="return prepareMessagesForm()">
+    <label for="msgMenu">Menu Name</label>
+    <input id="msgMenu" name="menuName" type="text" required maxlength="24" value="__MSG_MENU__" placeholder="Messages">
 
-    <label for="dadTop">Top Text</label>
-    <input id="dadTop" name="topText" type="text" maxlength="20" value="__DAD_TOP__" placeholder="To Logan:">
+    <label for="msgTop">Top Text</label>
+    <input id="msgTop" name="topText" type="text" maxlength="20" value="__MSG_TOP__" placeholder="To Logan:">
 
-    <label for="dadBot">Bottom Text</label>
-    <input id="dadBot" name="bottomText" type="text" maxlength="16" value="__DAD_BOT__" placeholder="- Dad">
+    <label for="msgBot">Bottom Text</label>
+    <input id="msgBot" name="bottomText" type="text" maxlength="16" value="__MSG_BOT__" placeholder="- Dad">
 
     <label>Scrolling Sayings</label>
     <div id="sayingList" class="saying-list"></div>
@@ -158,8 +158,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 
     <textarea id="sayingsHidden" name="sayings" style="display:none"></textarea>
     <div class="row" style="margin-top:16px">
-      <button type="button" class="btn btn-sec" onclick="resetDadDefaults()">Reset Defaults</button>
-      <button type="submit" class="btn" style="margin-top:0">Save Dad Settings</button>
+      <button type="button" class="btn btn-sec" onclick="resetMessagesDefaults()">Reset Defaults</button>
+      <button type="submit" class="btn" style="margin-top:0">Save Message Settings</button>
     </div>
   </form>
 </div>
@@ -179,8 +179,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
 </div>
 </div>
 <script>
-var dadSayings=__DAD_SAYINGS_JSON__;
-var dadDefaultSayings=__DAD_DEFAULT_SAYINGS_JSON__;
+var msgSayings=__MSG_SAYINGS_JSON__;
+var msgDefaultSayings=__MSG_DEFAULT_SAYINGS_JSON__;
 function switchTab(name){
   var tabs=document.querySelectorAll('.tab');
   var panels=document.querySelectorAll('.panel');
@@ -190,20 +190,20 @@ function switchTab(name){
 function renderSayings(){
   var list=document.getElementById('sayingList');
   list.innerHTML='';
-  dadSayings.forEach(function(text,idx){
+  msgSayings.forEach(function(text,idx){
     var row=document.createElement('div');
     row.className='row';
     var inp=document.createElement('input');
     inp.type='text';
     inp.maxLength=120;
     inp.value=text;
-    inp.oninput=function(){dadSayings[idx]=this.value;};
+    inp.oninput=function(){msgSayings[idx]=this.value;};
     var del=document.createElement('button');
     del.type='button';
     del.className='btn-del';
     del.textContent='X';
     del.title='Remove saying';
-    del.onclick=function(){dadSayings.splice(idx,1);renderSayings();};
+    del.onclick=function(){msgSayings.splice(idx,1);renderSayings();};
     row.appendChild(inp);
     row.appendChild(del);
     list.appendChild(row);
@@ -213,19 +213,19 @@ function addSaying(){
   var inp=document.getElementById('newSaying');
   var val=inp.value.trim();
   if(!val){return;}
-  dadSayings.push(val);
+  msgSayings.push(val);
   inp.value='';
   renderSayings();
 }
-function resetDadDefaults(){
-  document.getElementById('dadMenu').value='Dad';
-  document.getElementById('dadTop').value='To Logan:';
-  document.getElementById('dadBot').value='- Dad';
-  dadSayings=dadDefaultSayings.slice();
+function resetMessagesDefaults(){
+  document.getElementById('msgMenu').value='Messages';
+  document.getElementById('msgTop').value='To Logan:';
+  document.getElementById('msgBot').value='- Dad';
+  msgSayings=msgDefaultSayings.slice();
   renderSayings();
 }
-function prepareDadForm(){
-  var cleaned=dadSayings.map(function(s){return s.replace(/[\r\n]+/g,' ').trim();}).filter(function(s){return s.length>0;});
+function prepareMessagesForm(){
+  var cleaned=msgSayings.map(function(s){return s.replace(/[\r\n]+/g,' ').trim();}).filter(function(s){return s.length>0;});
   document.getElementById('sayingsHidden').value=cleaned.join('\n');
   return true;
 }
@@ -292,11 +292,11 @@ setTimeout(pollClockTime,1000);
 WifiClockface::WifiClockface(Adafruit_GFX *display,
                              RotationCallback onRotationChanged,
                              PowerTimeoutCallback onPowerTimeoutsChanged,
-                             DadSettingsCallback onDadSettingsChanged)
+                             MenuSettingsCallback onMenuSettingsChanged)
   : _display(display),
     _onRotationChanged(onRotationChanged),
     _onPowerTimeoutsChanged(onPowerTimeoutsChanged),
-    _onDadSettingsChanged(onDadSettingsChanged)
+    _onMenuSettingsChanged(onMenuSettingsChanged)
 {
 }
 
@@ -334,7 +334,7 @@ void WifiClockface::setup(CWDateTime *dateTime)
   _server->on("/save", HTTP_POST, [this]() { handleSave(); });
   _server->on("/display", HTTP_POST, [this]() { handleDisplay(); });
   _server->on("/timezone", HTTP_POST, [this]() { handleTimeZone(); });
-  _server->on("/dad", HTTP_POST, [this]() { handleDad(); });
+  _server->on("/messages", HTTP_POST, [this]() { handleMessages(); });
   _server->on("/faces", HTTP_POST, [this]() { handleFaces(); });
   _server->on("/time", HTTP_GET, [this]() { handleTime(); });
   _server->onNotFound([this]() { handleNotFound(); });
@@ -432,9 +432,9 @@ void WifiClockface::handleRoot()
   html.replace("__DST_CHECKED__", WifiConfig::loadDstEnabled() ? " checked" : "");
   html.replace("__CLOCK_TIME__", escapeHtml(formatClockTime()));
 
-  html.replace("__DAD_MENU__", escapeHtml(WifiConfig::loadDadMenuName()));
-  html.replace("__DAD_TOP__", escapeHtml(WifiConfig::loadDadTopText()));
-  html.replace("__DAD_BOT__", escapeHtml(WifiConfig::loadDadBottomText()));
+  html.replace("__MSG_MENU__", escapeHtml(WifiConfig::loadMessagesMenuName()));
+  html.replace("__MSG_TOP__", escapeHtml(WifiConfig::loadMessagesTopText()));
+  html.replace("__MSG_BOT__", escapeHtml(WifiConfig::loadMessagesBottomText()));
 
   auto buildSayingsJson = [](const std::vector<String> &items) {
     String json = "[";
@@ -448,20 +448,20 @@ void WifiClockface::handleRoot()
     return json;
   };
 
-  std::vector<String> dadSayings;
-  WifiConfig::loadDadSayings(dadSayings);
-  std::vector<String> dadDefaults;
-  WifiConfig::loadDefaultDadSayings(dadDefaults);
-  html.replace("__DAD_SAYINGS_JSON__", buildSayingsJson(dadSayings));
-  html.replace("__DAD_DEFAULT_SAYINGS_JSON__", buildSayingsJson(dadDefaults));
+  std::vector<String> msgSayings;
+  WifiConfig::loadMessages(msgSayings);
+  std::vector<String> msgDefaults;
+  WifiConfig::loadDefaultMessages(msgDefaults);
+  html.replace("__MSG_SAYINGS_JSON__", buildSayingsJson(msgSayings));
+  html.replace("__MSG_DEFAULT_SAYINGS_JSON__", buildSayingsJson(msgDefaults));
 
-  String dadName = WifiConfig::loadDadMenuName();
+  String messagesName = WifiConfig::loadMessagesMenuName();
   uint32_t faceMask = WifiConfig::loadEnabledFacesMask();
   String faceCheckboxes;
   for (int i = 0; i < ClockfaceRegistry::SELECTABLE_COUNT; ++i) {
     bool checked = WifiConfig::isFaceEnabled(faceMask, i, WifiConfig::SETTINGS_FACE_INDEX);
-    const char *label = (i == ClockfaceRegistry::DAD_INDEX)
-                        ? dadName.c_str()
+    const char *label = (i == ClockfaceRegistry::MESSAGES_INDEX)
+                        ? messagesName.c_str()
                         : ClockfaceRegistry::defaultLabel(i);
     faceCheckboxes += "<label class='chk'><input type='checkbox' name='face_";
     faceCheckboxes += String(i);
@@ -666,7 +666,7 @@ bool WifiClockface::syncNtpWithCredentials(const String &ssid, const String &pas
   return ntpSynced;
 }
 
-void WifiClockface::handleDad()
+void WifiClockface::handleMessages()
 {
   String menuName = _server->hasArg("menuName") ? _server->arg("menuName") : "";
   String topText  = _server->hasArg("topText")  ? _server->arg("topText")  : "";
@@ -676,7 +676,7 @@ void WifiClockface::handleDad()
   menuName.trim();
   if (menuName.length() > 24) menuName = menuName.substring(0, 24);
   if (menuName.length() == 0) {
-    menuName = WifiConfig::DEFAULT_DAD_MENU_NAME;
+    menuName = WifiConfig::DEFAULT_MSG_MENU_NAME;
   }
   if (topText.length() > 20) topText = topText.substring(0, 20);
   if (botText.length() > 16) botText = botText.substring(0, 16);
@@ -697,16 +697,16 @@ void WifiClockface::handleDad()
   }
 
   if (sayings.empty()) {
-    WifiConfig::loadDefaultDadSayings(sayings);
+    WifiConfig::loadDefaultMessages(sayings);
   }
 
-  WifiConfig::saveDadMenuName(menuName);
-  WifiConfig::saveDadTopText(topText);
-  WifiConfig::saveDadBottomText(botText);
-  WifiConfig::saveDadSayings(sayings);
+  WifiConfig::saveMessagesMenuName(menuName);
+  WifiConfig::saveMessagesTopText(topText);
+  WifiConfig::saveMessagesBottomText(botText);
+  WifiConfig::saveMessages(sayings);
 
-  if (_onDadSettingsChanged) {
-    _onDadSettingsChanged();
+  if (_onMenuSettingsChanged) {
+    _onMenuSettingsChanged();
   }
 
   _statusLine = "SAVED";
@@ -715,17 +715,17 @@ void WifiClockface::handleDad()
 
   String page = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
                 "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-                "<title>Dad Settings Saved</title>"
+                "<title>Message Settings Saved</title>"
                 "<style>body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;display:flex;justify-content:center}"
                 ".card{max-width:420px;width:100%;background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px}"
                 "a{display:inline-block;margin-top:16px;padding:10px 14px;background:#0284c7;color:#fff;text-decoration:none;border-radius:8px}</style>"
                 "</head><body><div class='card'>"
-                "<h2 style='color:#4ade80;margin-top:0'>Dad Settings Saved!</h2>"
-                "<p>Menu Name: <strong>" + escapeHtml(WifiConfig::loadDadMenuName()) + "</strong></p>"
+                "<h2 style='color:#4ade80;margin-top:0'>Message Settings Saved!</h2>"
+                "<p>Menu Name: <strong>" + escapeHtml(WifiConfig::loadMessagesMenuName()) + "</strong></p>"
                 "<p>Top Text: <strong>" + escapeHtml(topText) + "</strong></p>"
                 "<p>Bottom Text: <strong>" + escapeHtml(botText) + "</strong></p>"
                 "<p>Sayings saved: <strong>" + String(sayings.size()) + "</strong></p>"
-                "<a href='/?tab=dad'>Back to Dad Settings</a></div></body></html>";
+                "<a href='/?tab=messages'>Back to Message Settings</a></div></body></html>";
 
   _server->send(200, "text/html", page);
 }
@@ -743,8 +743,8 @@ void WifiClockface::handleFaces()
   }
 
   WifiConfig::saveEnabledFacesMask(mask, WifiConfig::SETTINGS_FACE_INDEX);
-  if (_onDadSettingsChanged) {
-    _onDadSettingsChanged();
+  if (_onMenuSettingsChanged) {
+    _onMenuSettingsChanged();
   }
 
   _statusLine = "SAVED";

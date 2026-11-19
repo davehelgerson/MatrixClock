@@ -18,7 +18,7 @@ class WifiClockface : public IClockface {
   public:
     using RotationCallback = void (*)(uint8_t);
     using PowerTimeoutCallback = void (*)(uint16_t, uint16_t);
-    using DadSettingsCallback = void (*)();
+    using MenuSettingsCallback = void (*)();
 
   private:
     static constexpr const char *AP_SSID = "MatrixWiFi";
@@ -27,7 +27,7 @@ class WifiClockface : public IClockface {
     CWDateTime *_dateTime = nullptr;
     RotationCallback _onRotationChanged = nullptr;
     PowerTimeoutCallback _onPowerTimeoutsChanged = nullptr;
-    DadSettingsCallback _onDadSettingsChanged = nullptr;
+    MenuSettingsCallback _onMenuSettingsChanged = nullptr;
     std::unique_ptr<WebServer> _server;
     std::unique_ptr<DNSServer> _dnsServer;
 
@@ -45,7 +45,7 @@ class WifiClockface : public IClockface {
     void handleSave();
     void handleDisplay();
     void handleTimeZone();
-    void handleDad();
+    void handleMessages();
     void handleFaces();
     void handleTime();
     void handleNotFound();
@@ -67,7 +67,7 @@ class WifiClockface : public IClockface {
     WifiClockface(Adafruit_GFX *display,
                   RotationCallback onRotationChanged = nullptr,
                   PowerTimeoutCallback onPowerTimeoutsChanged = nullptr,
-                  DadSettingsCallback onDadSettingsChanged = nullptr);
+                  MenuSettingsCallback onMenuSettingsChanged = nullptr);
     ~WifiClockface() override;
 
     void setup(CWDateTime *dateTime) override;

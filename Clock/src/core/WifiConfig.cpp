@@ -6,13 +6,13 @@
 
 namespace {
 const char *PREF_NAMESPACE = "wifi";
-const char *DAD_NAMESPACE  = "dad";
-const char *KEY_DAD_MENU   = "menu";
-const char *KEY_DAD_TOP    = "top";
-const char *KEY_DAD_BOT    = "bot";
-const char *KEY_DAD_SAY    = "sayings";
+const char *MSG_NAMESPACE  = "dad"; // Kept as "dad" for NVS backward compatibility
+const char *KEY_MSG_MENU   = "menu";
+const char *KEY_MSG_TOP    = "top";
+const char *KEY_MSG_BOT    = "bot";
+const char *KEY_MSG_SAY    = "sayings";
 
-const char *const DEFAULT_DAD_SAYINGS[] = {
+const char *const DEFAULT_MSG_SAYINGS[] = {
   "I love you!",
   "You are the best son!",
   "You are amazing!",
@@ -32,7 +32,7 @@ const char *const DEFAULT_DAD_SAYINGS[] = {
   "Thank you for being you!",
   "You are courageous and strong!"
 };
-constexpr size_t DEFAULT_DAD_SAYINGS_COUNT = sizeof(DEFAULT_DAD_SAYINGS) / sizeof(DEFAULT_DAD_SAYINGS[0]);
+constexpr size_t DEFAULT_MSG_SAYINGS_COUNT = sizeof(DEFAULT_MSG_SAYINGS) / sizeof(DEFAULT_MSG_SAYINGS[0]);
 const char *KEY_SSID       = "ssid";
 const char *KEY_PASSWORD   = "pass";
 const char *KEY_ROTATION   = "rot";
@@ -261,10 +261,10 @@ const char *WifiConfig::getPosixTimeZone()
   return dst ? TIME_ZONES[idx].posixDst : TIME_ZONES[idx].posixStd;
 }
 
-static String loadDadStr(const char *key, const char *defVal)
+static String loadMsgStr(const char *key, const char *defVal)
 {
   Preferences prefs;
-  if (!prefs.begin(DAD_NAMESPACE, true)) {
+  if (!prefs.begin(MSG_NAMESPACE, true)) {
     return String(defVal);
   }
   String val = prefs.getString(key, defVal);
@@ -272,10 +272,10 @@ static String loadDadStr(const char *key, const char *defVal)
   return val;
 }
 
-static bool saveDadStr(const char *key, const String &val)
+static bool saveMsgStr(const char *key, const String &val)
 {
   Preferences prefs;
-  if (!prefs.begin(DAD_NAMESPACE, false)) {
+  if (!prefs.begin(MSG_NAMESPACE, false)) {
     return false;
   }
   prefs.putString(key, val);
@@ -283,72 +283,72 @@ static bool saveDadStr(const char *key, const String &val)
   return true;
 }
 
-String WifiConfig::loadDadMenuName()
+String WifiConfig::loadMessagesMenuName()
 {
-  String s = loadDadStr(KEY_DAD_MENU, DEFAULT_DAD_MENU_NAME);
+  String s = loadMsgStr(KEY_MSG_MENU, DEFAULT_MSG_MENU_NAME);
   s.replace("\n", " ");
   s.replace("\r", "");
   s.trim();
-  return (s.length() > 0) ? s : String(DEFAULT_DAD_MENU_NAME);
+  return (s.length() > 0) ? s : String(DEFAULT_MSG_MENU_NAME);
 }
 
-bool WifiConfig::saveDadMenuName(const String &name)
+bool WifiConfig::saveMessagesMenuName(const String &name)
 {
   String s = name;
   s.replace("\n", " ");
   s.replace("\r", "");
   s.trim();
   if (s.length() == 0) {
-    s = DEFAULT_DAD_MENU_NAME;
+    s = DEFAULT_MSG_MENU_NAME;
   }
-  return saveDadStr(KEY_DAD_MENU, s);
+  return saveMsgStr(KEY_MSG_MENU, s);
 }
 
-String WifiConfig::loadDadTopText()
+String WifiConfig::loadMessagesTopText()
 {
-  return loadDadStr(KEY_DAD_TOP, DEFAULT_DAD_TOP_TEXT);
+  return loadMsgStr(KEY_MSG_TOP, DEFAULT_MSG_TOP_TEXT);
 }
 
-bool WifiConfig::saveDadTopText(const String &text)
+bool WifiConfig::saveMessagesTopText(const String &text)
 {
-  return saveDadStr(KEY_DAD_TOP, text);
+  return saveMsgStr(KEY_MSG_TOP, text);
 }
 
-String WifiConfig::loadDadBottomText()
+String WifiConfig::loadMessagesBottomText()
 {
-  return loadDadStr(KEY_DAD_BOT, DEFAULT_DAD_BOT_TEXT);
+  return loadMsgStr(KEY_MSG_BOT, DEFAULT_MSG_BOT_TEXT);
 }
 
-bool WifiConfig::saveDadBottomText(const String &text)
+bool WifiConfig::saveMessagesBottomText(const String &text)
 {
-  return saveDadStr(KEY_DAD_BOT, text);
+  return saveMsgStr(KEY_MSG_BOT, text);
 }
 
-void WifiConfig::loadDefaultDadSayings(std::vector<String> &out)
+void WifiConfig::loadDefaultMessages(std::vector<String> &out)
 {
   out.clear();
-  out.reserve(DEFAULT_DAD_SAYINGS_COUNT);
-  for (size_t i = 0; i < DEFAULT_DAD_SAYINGS_COUNT; ++i) {
-    out.emplace_back(DEFAULT_DAD_SAYINGS[i]);
+  out.reserve(DEFAULT_MSG_SAYINGS_COUNT);
+  for (size_t i = 0; i < DEFAULT_MSG_SAYINGS_COUNT; ++i) {
+    out.emplace_back(DEFAULT_MSG_SAYINGS[i]);
   }
 }
 
-void WifiConfig::loadDadSayings(std::vector<String> &out)
+void WifiConfig::loadMessages(std::vector<String> &out)
 {
   out.clear();
   Preferences prefs;
-  if (!prefs.begin(DAD_NAMESPACE, true)) {
-    loadDefaultDadSayings(out);
+  if (!prefs.begin(MSG_NAMESPACE, true)) {
+    loadDefaultMessages(out);
     return;
   }
 
-  if (!prefs.isKey(KEY_DAD_SAY)) {
+  if (!prefs.isKey(KEY_MSG_SAY)) {
     prefs.end();
-    loadDefaultDadSayings(out);
+    loadDefaultMessages(out);
     return;
   }
 
-  String raw = prefs.getString(KEY_DAD_SAY, "");
+  String raw = prefs.getString(KEY_MSG_SAY, "");
   prefs.end();
 
   int start = 0;
@@ -365,11 +365,11 @@ void WifiConfig::loadDadSayings(std::vector<String> &out)
   }
 
   if (out.empty()) {
-    loadDefaultDadSayings(out);
+    loadDefaultMessages(out);
   }
 }
 
-bool WifiConfig::saveDadSayings(const std::vector<String> &sayings)
+bool WifiConfig::saveMessages(const std::vector<String> &sayings)
 {
   String joined;
   for (size_t i = 0; i < sayings.size(); ++i) {
@@ -383,13 +383,13 @@ bool WifiConfig::saveDadSayings(const std::vector<String> &sayings)
   }
 
   Preferences prefs;
-  if (!prefs.begin(DAD_NAMESPACE, false)) {
+  if (!prefs.begin(MSG_NAMESPACE, false)) {
     return false;
   }
   if (joined.length() == 0) {
-    prefs.remove(KEY_DAD_SAY);
+    prefs.remove(KEY_MSG_SAY);
   } else {
-    prefs.putString(KEY_DAD_SAY, joined);
+    prefs.putString(KEY_MSG_SAY, joined);
   }
   prefs.end();
   return true;

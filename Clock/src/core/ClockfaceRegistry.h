@@ -15,7 +15,7 @@ enum FaceIndex : int {
   FACE_PACMAN2   = 2,
   FACE_POKEDEX   = 3,
   FACE_MAPLE     = 4,
-  FACE_DAD       = 5,
+  FACE_MESSAGES  = 5,
   FACE_STARS     = 6,
   FACE_PIPES     = 7,
   FACE_ANALOG    = 8,
@@ -27,7 +27,7 @@ enum FaceIndex : int {
   COUNT          = 14
 };
 
-static constexpr int DAD_INDEX        = FACE_DAD;
+static constexpr int MESSAGES_INDEX   = FACE_MESSAGES;
 static constexpr int JOKE_INDEX       = FACE_JOKE;
 static constexpr int SETTINGS_INDEX   = FACE_SETTINGS;
 static constexpr int SELECTABLE_COUNT = FACE_SETTINGS; // All faces except always-on Settings
@@ -42,7 +42,7 @@ inline const char *defaultLabel(int index)
     "Pacman 2",
     "Pokedex",
     "Maple",
-    "Dad",
+    "Messages",
     "Stars",
     "Pipes",
     "Analog",

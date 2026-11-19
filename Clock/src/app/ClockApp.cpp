@@ -67,7 +67,7 @@ namespace {
     clockApp.setPowerTimeouts(dimMinutes, offMinutes);
   }
 
-  void onDadSettingsChanged() {
+  void onMenuSettingsChanged() {
     clockApp.refreshMenuLabels();
   }
 
@@ -196,7 +196,7 @@ void ClockApp::initClockfaces()
   _clockfaces[FACE_PACMAN2]   = new Pacman2Clockface(_dmaDisplay);
   _clockfaces[FACE_POKEDEX]   = new Clockface1(_dmaDisplay);
   _clockfaces[FACE_MAPLE]     = new Clockface4(_dmaDisplay);
-  _clockfaces[FACE_DAD]       = new Clockface5(_dmaDisplay);
+  _clockfaces[FACE_MESSAGES]  = new Clockface5(_dmaDisplay);
   _clockfaces[FACE_STARS]     = new StarsClockface(_dmaDisplay);
   _clockfaces[FACE_PIPES]     = new PipesClockface(_dmaDisplay);
   _clockfaces[FACE_ANALOG]    = new AnalogClockface(_dmaDisplay);
@@ -207,7 +207,7 @@ void ClockApp::initClockfaces()
   _clockfaces[FACE_SETTINGS]  = new WifiClockface(_dmaDisplay,
                                                   onRotationSettingChanged,
                                                   onPowerTimeoutsChanged,
-                                                  onDadSettingsChanged);
+                                                  onMenuSettingsChanged);
 
   int startIdx = (_gifIndex >= 0 && _gifIndex < CLOCKFACE_COUNT) ? _gifIndex : 0;
   _clockfaces[startIdx]->setup(&_dateTime);
@@ -475,7 +475,7 @@ int ClockApp::rollerPositionForFace(int faceIndex) const
 void ClockApp::rebuildVisibleMenu(bool animateOff)
 {
   (void)animateOff;
-  String dadName = WifiConfig::loadDadMenuName();
+  String messagesName = WifiConfig::loadMessagesMenuName();
 
   uint32_t mask = WifiConfig::loadEnabledFacesMask();
   String rollerOpts;
@@ -485,8 +485,8 @@ void ClockApp::rebuildVisibleMenu(bool animateOff)
   for (int i = 0; i < CLOCKFACE_COUNT; ++i) {
     if (WifiConfig::isFaceEnabled(mask, i, SETTINGS_FACE_INDEX)) {
       if (nextCount > 0) rollerOpts += "\n";
-      const char *label = (i == ClockfaceRegistry::DAD_INDEX)
-                          ? dadName.c_str()
+      const char *label = (i == ClockfaceRegistry::MESSAGES_INDEX)
+                          ? messagesName.c_str()
                           : ClockfaceRegistry::defaultLabel(i);
       rollerOpts += label;
       nextFaces[nextCount++] = i;

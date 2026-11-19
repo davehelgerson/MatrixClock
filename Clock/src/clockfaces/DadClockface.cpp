@@ -39,11 +39,11 @@ void Clockface5::setup(CWDateTime *dateTime)
   _dateTime = dateTime;
   randomSeed(esp_random());
 
-  _topText = WifiConfig::loadDadTopText();
-  _bottomText = WifiConfig::loadDadBottomText();
-  WifiConfig::loadDadSayings(_sayings);
+  _topText = WifiConfig::loadMessagesTopText();
+  _bottomText = WifiConfig::loadMessagesBottomText();
+  WifiConfig::loadMessages(_sayings);
   if (_sayings.empty()) {
-    WifiConfig::loadDefaultDadSayings(_sayings);
+    WifiConfig::loadDefaultMessages(_sayings);
   }
 
   auto* d = Locator::getDisplay();
