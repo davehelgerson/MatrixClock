@@ -302,7 +302,7 @@ void InvadersClockface::updateAliens()
 void InvadersClockface::updateShip()
 {
   if (_shipHit) {
-    if (millis() >= _shipRespawnAt) {
+    if (static_cast<long>(millis() - _shipRespawnAt) >= 0) {
       _shipHit = false;
       _shipX = 28;
       drawShip(_shipX, COLOR_SHIP);
@@ -458,7 +458,7 @@ void InvadersClockface::updateUfo()
 {
   unsigned long now = millis();
   if (!_ufoActive) {
-    if (now >= _nextUfoMillis) {
+    if (static_cast<long>(now - _nextUfoMillis) >= 0) {
       _ufoActive = true;
       _ufoDir = (random(2) == 0) ? 1 : -1;
       _ufoX = (_ufoDir > 0) ? -7 : 64;

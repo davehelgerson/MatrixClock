@@ -370,7 +370,9 @@ void ClockApp::handlePowerState()
 {
   uint16_t dimMin = WifiConfig::normalizeTimeoutMinutes(__atomic_load_n(&_dimMinutes, __ATOMIC_ACQUIRE));
   uint16_t offMin = WifiConfig::normalizeTimeoutMinutes(__atomic_load_n(&_offMinutes, __ATOMIC_ACQUIRE));
-  unsigned long idleTime = millis() - __atomic_load_n(&_lastActivityMillis, __ATOMIC_ACQUIRE);
+  unsigned long lastActivity = __atomic_load_n(&_lastActivityMillis, __ATOMIC_ACQUIRE);
+  unsigned long now = millis();
+  unsigned long idleTime = (static_cast<long>(now - lastActivity) > 0) ? (now - lastActivity) : 0UL;
   bool sleeping = __atomic_load_n(&_screenSleeping, __ATOMIC_ACQUIRE);
   bool dimmed   = __atomic_load_n(&_screenDimmed, __ATOMIC_ACQUIRE);
 
@@ -545,6 +547,9 @@ void ClockApp::readTouchpad(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
     return;
   }
 
+  touchX = constrain(touchX, 0, static_cast<int>(TFT_WIDTH - 1));
+  touchY = constrain(touchY, 0, static_cast<int>(TFT_HEIGHT - 1));
+
   data->state = LV_INDEV_STATE_PR;
   switch (_tftRotation) {
     case 0:
@@ -553,15 +558,15 @@ void ClockApp::readTouchpad(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
       break;
     case 1:
       data->point.x = (uint16_t)touchY;
-      data->point.y = (uint16_t)(TFT_HEIGHT - touchX);
+      data->point.y = (uint16_t)((TFT_HEIGHT - 1) - touchX);
       break;
     case 2:
-      data->point.x = (uint16_t)(TFT_WIDTH - touchX);
-      data->point.y = (uint16_t)(TFT_HEIGHT - touchY);
+      data->point.x = (uint16_t)((TFT_WIDTH - 1) - touchX);
+      data->point.y = (uint16_t)((TFT_HEIGHT - 1) - touchY);
       break;
     case 3:
     default:
-      data->point.x = (uint16_t)(TFT_WIDTH - touchY);
+      data->point.x = (uint16_t)((TFT_WIDTH - 1) - touchY);
       data->point.y = (uint16_t)touchX;
       break;
   }

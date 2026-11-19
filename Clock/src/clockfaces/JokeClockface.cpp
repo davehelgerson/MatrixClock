@@ -52,7 +52,7 @@ void startBackgroundJokeFetch(int year, int month, int day)
     return;
   }
   BaseType_t ok = xTaskCreatePinnedToCore(
-    jokeFetchTask, "Task_JokeFetch", 6144, req, 1, nullptr, 0);
+    jokeFetchTask, "Task_JokeFetch", 12288, req, 1, nullptr, 0);
   if (ok != pdPASS) {
     delete req;
     __atomic_store_n(&gJokeFetchInProgress, false, __ATOMIC_RELEASE);
